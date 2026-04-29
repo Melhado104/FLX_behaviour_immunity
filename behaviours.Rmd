@@ -1,0 +1,477 @@
+---
+title: "Exp. 1_behaviours"
+author: "Gabriel Melhado"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load packages
+pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggeffects, scales)
+
+```
+
+
+```{r}
+# Load Data
+data <- read.csv(here("data", "exp1_data.csv"))
+
+```
+
+```{r}
+# Factorise IDs + treatment
+data <- data %>%
+  mutate(
+    Treatment = factor(Treatment),
+    Tank_ID   = factor(Tank_ID),
+    Fish_ID   = factor(Fish_ID),
+    Batch     = factor(Batch),
+    Trial     = factor(Trial),
+    Arena     = factor(Arena)
+  )
+
+```
+
+```{r}
+# Create a subset excluding fish not came out
+# Remove fish that did not come out of shelter
+data_subset <- subset(data, notes != "not came out")
+
+# Check sample size
+nrow(data)        # 160
+nrow(data_subset) # 126
+```
+```{r}
+data$emerged <- ifelse(data$notes == "not came out", 0, 1)
+
+emergence_probability_model <- glmmTMB(emerged ~ Treatment + Body_mass + (1|Tank_ID),
+        family = binomial,
+        data = data)
+
+
+summary(emergence_probability_model)
+Anova(emergence_probability_model)
+
+emm <- emmeans(emergence_probability_model, ~ Treatment)
+
+summary(emm, type = "response")
+
+```
+
+```{r}
+#Distance_moved
+#Family tweedie
+m2_distance_moved <- glmmTMB(Distance_moved ~ Treatment + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log"))
+
+summary(m2_distance_moved)
+
+# Diagnosis
+res_m2_distance_moved <- simulateResiduals(m2_distance_moved)
+plot(res_m2_distance_moved)
+
+testDispersion(res_m2_distance_moved)
+testZeroInflation(res_m2_distance_moved)
+testOutliers(res_m2_distance_moved)
+
+Anova(m2_distance_moved)
+
+```
+
+
+```{r}
+# Plotting Distance_moved
+# 1) Ensure treatment order
+data$Treatment <- factor(
+  data$Treatment,
+  levels = c("Control", "low", "high")
+)
+
+# 2) Fit Tweedie model
+m2_distance_moved <- glmmTMB(
+  Distance_moved ~ Treatment + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log")
+)
+
+summary(m2_distance_moved)
+
+# 3) Get marginal means on the response scale
+emm_dist_df <- as.data.frame(
+  emmeans(m2_distance_moved, ~ Treatment, type = "response")
+)
+
+print(emm_dist_df)
+
+# 4) Standardise column names
+cn <- names(emm_dist_df)
+
+mean_col  <- dplyr::first(cn[cn %in% c("response", "rate", "emmean")])
+lower_col <- dplyr::first(cn[grepl("^lower\\.CL$|^asymp\\.LCL$|^LCL$|^lower$", cn)])
+upper_col <- dplyr::first(cn[grepl("^upper\\.CL$|^asymp\\.UCL$|^UCL$|^upper$", cn)])
+
+if (is.na(mean_col) || is.na(lower_col) || is.na(upper_col)) {
+  stop("Could not identify mean/CI columns in emmeans output. Run names(emm_dist_df).")
+}
+
+emm_dist_df <- emm_dist_df %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  rename(
+    mean  = !!mean_col,
+    lower = !!lower_col,
+    upper = !!upper_col
+  )
+
+# 5) Palettes
+pastel_cols <- c(
+  "Control" = "#A8D5BA",
+  "low"     = "#F9E79F",
+  "high"    = "#F5B7B1"
+)
+
+dark_cols <- c(
+  "Control" = "#2E8B57",
+  "low"     = "#C9A227",
+  "high"    = "#B22222"
+)
+
+# 6) Plot on original distance scale
+p_distance <- ggplot() +
+  geom_violin(
+    data = data,
+    aes(x = Treatment, y = Distance_moved, fill = Treatment),
+    alpha = 0.20,
+    colour = NA,
+    trim = FALSE
+  ) +
+  geom_jitter(
+    data = data,
+    aes(x = Treatment, y = Distance_moved, colour = Treatment),
+    width = 0.18,
+    alpha = 0.55,
+    size = 2
+  ) +
+  geom_errorbar(
+    data = emm_dist_df,
+    aes(x = Treatment, ymin = lower, ymax = upper, colour = Treatment),
+    width = 0.25,
+    linewidth = 1.3
+  ) +
+  geom_point(
+    data = emm_dist_df,
+    aes(x = Treatment, y = mean, fill = Treatment),
+    shape = 21,
+    size = 5,
+    stroke = 1.2,
+    colour = "black"
+  ) +
+  scale_fill_manual(values = pastel_cols) +
+  scale_colour_manual(values = dark_cols) +
+  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10),
+  breaks = c(0, 1000, 10000, 50000),
+  labels = scales::comma) +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Fluoxetine treatment",
+    y = "Distance moved"
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+
+print(p_distance)
+```
+
+
+
+```{r}
+#Time_shelter
+
+data_moved <- subset(data, Time_shelter > 0 & Time_shelter < 1200)
+data_moved$prop_shelter <- data_moved$Time_shelter / 1200
+
+beta <-glmmTMB(
+  prop_shelter ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = beta_family(link="logit"),
+  data = data_moved
+)
+
+summary(beta)
+
+res_beta <- simulateResiduals(beta)
+plot(res_beta)
+
+testDispersion(res_beta)
+testZeroInflation(res_beta)
+testOutliers(res_beta)
+
+Anova(beta)
+
+```
+
+
+```{r}
+# Plotting Time_shelter
+
+# 1) Ensure treatment order
+data$Treatment <- factor(
+  data$Treatment,
+  levels = c("Control", "low", "high")
+)
+
+# 2) Create log-transformed shelter time
+# log1p handles zeros safely
+data$logTS <- log1p(data$Time_shelter)
+
+# 3) Fit model
+m_logTS <- glmmTMB(
+  logTS ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+summary(m_logTS)
+
+# 4) Get marginal means on the LOG scale
+emm_logTS_df <- as.data.frame(emmeans(m_logTS, ~ Treatment))
+
+# 5) Back-transform to original time scale
+cn <- names(emm_logTS_df)
+
+mean_col  <- if ("emmean" %in% cn) "emmean" else stop("Can't find emmean column")
+lower_col <- dplyr::first(cn[grepl("^lower\\.CL$|^asymp\\.LCL$|^LCL$|^lower$", cn)])
+upper_col <- dplyr::first(cn[grepl("^upper\\.CL$|^asymp\\.UCL$|^UCL$|^upper$", cn)])
+
+emm_logTS_df <- emm_logTS_df %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  rename(mean_log = !!mean_col, lower_log = !!lower_col, upper_log = !!upper_col) %>%
+  mutate(
+    mean  = exp(mean_log) - 1,
+    lower = exp(lower_log) - 1,
+    upper = exp(upper_log) - 1
+  )
+
+# 6) Palettes
+pastel_cols <- c(
+  "Control" = "#A8D5BA",
+  "low"     = "#F9E79F",
+  "high"    = "#F5B7B1"
+)
+
+dark_cols <- c(
+  "Control" = "#2E8B57",
+  "low"     = "#C9A227",
+  "high"    = "#B22222"
+)
+
+# 7) Plot on original scale
+ggplot() +
+  geom_violin(
+    data = data,
+    aes(x = Treatment, y = Time_shelter, fill = Treatment),
+    alpha = 0.20, colour = NA, trim = FALSE
+  ) +
+  geom_jitter(
+    data = data,
+    aes(x = Treatment, y = Time_shelter, colour = Treatment),
+    width = 0.18, alpha = 0.55, size = 2
+  ) +
+  geom_errorbar(
+    data = emm_logTS_df,
+    aes(x = Treatment, ymin = lower, ymax = upper, colour = Treatment),
+    width = 0.25, linewidth = 1.3
+  ) +
+  geom_point(
+    data = emm_logTS_df,
+    aes(x = Treatment, y = mean, fill = Treatment),
+    shape = 21, size = 5, stroke = 1.2, colour = "black"
+  ) +
+  scale_fill_manual(values = pastel_cols) +
+  scale_colour_manual(values = dark_cols) +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Fluoxetine treatment",
+    y = "Time spent in shelter"
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+```
+
+
+```{r}
+## Time_freezing
+# Family: Tweedie
+m1_time_not_moving <- glmmTMB(Time_not_moving ~ Treatment + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log"))
+
+summary(m1_time_not_moving)
+
+# Diagnosis
+res_m1_time_not_moving <- simulateResiduals(m1_time_not_moving)
+plot(res_m1_time_not_moving)
+
+testDispersion(res_m1_time_not_moving)
+testZeroInflation(res_m1_time_not_moving)
+testOutliers(res_m1_time_not_moving)
+
+# Anova of the model
+Anova(m1_time_not_moving)
+
+```
+
+```{r}
+## Time_not_moving (freezing time)
+
+# 1) Ensure treatment order
+data$Treatment <- factor(
+  data$Treatment,
+  levels = c("Control", "low", "high")
+)
+
+# 2) Fit Tweedie model
+m1_time_not_moving <- glmmTMB(
+  Time_not_moving ~ Treatment + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log")
+)
+
+summary(m1_time_not_moving)
+
+# 3) Estimated marginal means on response scale
+emm_freezing <- as.data.frame(
+  emmeans(m1_time_not_moving, ~ Treatment, type = "response")
+)
+
+print(emm_freezing)
+
+# 4) Standardise column names
+cn <- names(emm_freezing)
+
+mean_col  <- dplyr::first(cn[cn %in% c("response", "rate", "emmean")])
+lower_col <- dplyr::first(cn[grepl("^lower\\.CL$|^asymp\\.LCL$|^LCL$|^lower$", cn)])
+upper_col <- dplyr::first(cn[grepl("^upper\\.CL$|^asymp\\.UCL$|^UCL$|^upper$", cn)])
+
+if (is.na(mean_col) || is.na(lower_col) || is.na(upper_col)) {
+  stop("Could not identify mean/CI columns in emmeans output. Run names(emm_freezing).")
+}
+
+emm_freezing <- emm_freezing %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  rename(
+    mean  = !!mean_col,
+    lower = !!lower_col,
+    upper = !!upper_col
+  )
+
+# 5) Colour palettes
+pastel_cols <- c(
+  "Control" = "#A8D5BA",
+  "low"     = "#F9E79F",
+  "high"    = "#F5B7B1"
+)
+
+dark_cols <- c(
+  "Control" = "#2E8B57",
+  "low"     = "#C9A227",
+  "high"    = "#B22222"
+)
+
+# 6) Plot
+p_freezing <- ggplot() +
+  geom_violin(
+    data = data,
+    aes(x = Treatment, y = Time_not_moving, fill = Treatment),
+    alpha = 0.20,
+    colour = NA,
+    trim = FALSE
+  ) +
+  geom_jitter(
+    data = data,
+    aes(x = Treatment, y = Time_not_moving, colour = Treatment),
+    width = 0.18,
+    alpha = 0.55,
+    size = 2
+  ) +
+  geom_errorbar(
+    data = emm_freezing,
+    aes(x = Treatment, ymin = lower, ymax = upper, colour = Treatment),
+    width = 0.25,
+    linewidth = 1.3
+  ) +
+  geom_point(
+    data = emm_freezing,
+    aes(x = Treatment, y = mean, fill = Treatment),
+    shape = 21,
+    size = 5,
+    stroke = 1.2,
+    colour = "black"
+  ) +
+  scale_fill_manual(values = pastel_cols) +
+  scale_colour_manual(values = dark_cols) +
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Fluoxetine treatment",
+    y = "Time freezing"
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "none"
+  )
+
+print(p_freezing)
+
+```
+
+
+
+##### Behaviours X Immunity
+
+```{r}
+# Energetic trade-off
+m_dist_WBC <- glmmTMB(Distance_moved ~ Treatment + total_wbc + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log"))
+
+summary(m_dist_WBC)
+
+# Diagnosis
+res_m_dist_WBC <- simulateResiduals(m_dist_WBC)
+plot(res_m_dist_WBC)
+
+testDispersion(res_m_dist_WBC)
+testOutliers(res_m_dist_WBC)
+
+car::Anova(m_dist_WBC, type = "II")
+
+```
+
+
+```{r}
+# Stress-axis
+m_dist_NL <- glmmTMB(Distance_moved ~ Treatment + N.L_ratio + Body_mass + (1 | Tank_ID),
+  data = data,
+  family = tweedie(link = "log"))
+
+# Diagnosis
+res_m_dist_NL <- simulateResiduals(m_dist_NL)
+plot(res_m_dist_NL)
+
+testDispersion(res_m_dist_NL)
+testOutliers(res_m_dist_NL)
+
+summary(m_dist_NL)
+Anova(m_dist_NL)
+
+```
+

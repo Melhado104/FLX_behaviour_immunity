@@ -1,0 +1,399 @@
+---
+title: "baseline_immunity"
+author: "Gabriel Melhado"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load packages
+pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggplot2)
+
+```
+
+
+```{r}
+# Load Data
+data <- read.csv(here("data", "exp1_data.csv"))
+
+```
+
+```{r}
+
+summary(data$total_wbc)
+summary(data$Lymphocyte)
+summary(data$Neutrophil)
+summary(data$Monocyte)
+summary(data$`N-L_ratio`)
+
+hist(data$total_wbc)
+hist(data$Lymphocyte)
+hist(data$Neutrophil)
+hist(data$Monocyte)
+hist(data$`N.L_ratio`)
+
+```
+
+```{r}
+#WBC
+mean(data$total_wbc)
+var(data$total_wbc)
+sd(data$total_wbc)
+
+#Model
+m_wbc <- glmmTMB(
+  total_wbc ~ Treatment + Body_mass + (1|Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+summary(m_wbc)
+
+res_wbc <- simulateResiduals(m_wbc)
+plot(res_wbc)
+testDispersion(res_wbc)
+
+Anova (m_wbc)
+emm_wbc <- emmeans(m_wbc, ~ Treatment)
+
+pairs(emm_wbc, adjust = "tukey")
+```
+
+```{r}
+#Plotting WBC
+data$Treatment <- factor(data$Treatment,
+                         levels = c("Control", "low", "high"))
+
+emm_wbc <- emmeans(m_wbc, ~ Treatment)
+
+emm_df <- as.data.frame(emm_wbc)
+emm_df
+emm_df$Treatment <- factor(emm_df$Treatment,
+                           levels = c("Control", "low", "high"))
+
+
+# Pastel palette
+pastel_cols <- c(
+  "Control" = "#A8D5BA",  
+  "low"     = "#F9E79F",  
+  "high"    = "#F5B7B1" 
+)
+
+# Darker colours for model estimates
+dark_cols <- c(
+  "Control" = "#2E8B57",
+  "low"     = "#C9A227",
+  "high"    = "#B22222"
+)
+
+ggplot() +
+  
+  # Violin
+  geom_violin(data = data,
+              aes(x = Treatment, y = total_wbc, fill = Treatment),
+              alpha = 0.35,
+              colour = NA,
+              trim = FALSE) +
+  
+  # Raw points
+  geom_jitter(data = data,
+              aes(x = Treatment, y = total_wbc, colour = Treatment),
+              width = 0.15,
+              alpha = 0.6,
+              size = 2) +
+  
+  # Model estimated means
+  geom_point(data = emm_df,
+             aes(x = Treatment, y = emmean, colour = Treatment),
+             size = 4) +
+  
+  # Confidence intervals
+  geom_errorbar(data = emm_df,
+                aes(x = Treatment,
+                    ymin = lower.CL,
+                    ymax = upper.CL,
+                    colour = Treatment),
+                width = 0.2,
+                linewidth = 1) +
+  
+  scale_colour_manual(values = dark_cols) +
+  scale_fill_manual(values = pastel_cols) +
+  
+  theme_bw(base_size = 14) +
+  labs(x = "Fluoxetine treatment",
+       y = "Total white blood cells") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  )
+
+
+```
+
+```{r}
+#N/L ratio
+mean(data$N.L_ratio)
+var(data$N.L_ratio)
+sd(data$N.L_ratio)
+
+data$log_NL <- log(data$N.L_ratio)
+hist(data$log_NL)
+
+#Model
+m_NL <- glmmTMB(
+  log_NL ~ Treatment + Body_mass + (1|Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+summary(m_NL)
+
+res_NL <- DHARMa::simulateResiduals(m_NL)
+plot(res_NL)
+DHARMa::testDispersion(res_NL)
+
+Anova(m_NL)
+emm_NL <- emmeans(m_NL, ~ Treatment)
+pairs(emm_NL, adjust = "tukey")
+
+```
+
+```{r}
+# Plotting H/L ratio
+# Ensure treatment order (same as WBC figure)
+data$Treatment <- factor(data$Treatment, levels = c("Control", "low", "high"))
+
+# Pastel palette (violin fills)
+pastel_cols <- c(
+  "Control" = "#A8D5BA",
+  "low"     = "#F9E79F",
+  "high"    = "#F5B7B1"
+)
+
+# Darker palette (mean points + CIs)
+dark_cols <- c(
+  "Control" = "#2E8B57",
+  "low"     = "#C9A227",
+  "high"    = "#B22222"
+)
+
+# Get emmeans on the MODEL SCALE (log scale), then back-transform manually
+emm_NL <- emmeans(m_NL, ~ Treatment) %>% as.data.frame()
+
+emm_NL_df <- emm_NL %>%
+  mutate(
+    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    emmean_bt = exp(emmean),
+    lower_bt  = exp(lower.CL),
+    upper_bt  = exp(upper.CL)
+  )
+
+# Plot: violin + jitter (raw) + model means + 95% CI (back-transformed)
+ggplot() +
+
+  geom_violin(
+    data = data,
+    aes(x = Treatment, y = N.L_ratio, fill = Treatment),
+    alpha = 0.35,
+    colour = NA,
+    trim = FALSE
+  ) +
+
+  geom_jitter(
+    data = data,
+    aes(x = Treatment, y = N.L_ratio, colour = Treatment),
+    width = 0.15,
+    alpha = 0.6,
+    size = 2
+  ) +
+
+  geom_point(
+    data = emm_NL_df,
+    aes(x = Treatment, y = emmean_bt, colour = Treatment),
+    size = 4
+  ) +
+
+  geom_errorbar(
+    data = emm_NL_df,
+    aes(x = Treatment, ymin = lower_bt, ymax = upper_bt, colour = Treatment),
+    width = 0.2,
+    linewidth = 1
+  ) +
+
+  scale_fill_manual(values = pastel_cols) +
+  scale_colour_manual(values = dark_cols) +
+
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Fluoxetine treatment",
+    y = "N/L ratio") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  )
+```
+
+
+```{r}
+# Lymphocytes
+m_lymph_bb <- glmmTMB(
+  cbind(Lymphocyte, 100 - Lymphocyte) ~ Treatment + Body_mass + (1|Tank_ID),
+  family = betabinomial(link="logit"),
+  data = data
+)
+
+summary(m_lymph_bb)
+
+res_lymph_bb <- DHARMa::simulateResiduals(m_lymph_bb)
+plot(res_lymph_bb)
+DHARMa::testDispersion(res_lymph_bb)
+
+Anova(m_lymph_bb)
+emm_lymph <- emmeans(m_lymph_bb, ~ Treatment)
+pairs(emm_lymph, adjust = "tukey")
+
+
+```
+
+```{r}
+#Neutrophils
+mean(data$Neutrophil)
+var(data$Neutrophil)
+sd(data$Neutrophil)
+
+# Beta-binomial model
+m_neut_bb <- glmmTMB(
+  cbind(Neutrophil, 100 - Neutrophil) ~ Treatment + Body_mass + (1|Tank_ID),
+  family = betabinomial(link="logit"),
+  data = data
+)
+
+summary(m_neut_bb)
+
+res_neut_bb <- DHARMa::simulateResiduals(m_neut_bb)
+plot(res_neut_bb)
+DHARMa::testDispersion(res_neut_bb)
+
+Anova(m_neut_bb)
+emm_lymph <- emmeans(m_neut_bb, ~ Treatment)
+pairs(emm_lymph, adjust = "tukey")
+
+```
+
+```{r}
+#PLotting Lymphocytes and neutrophils
+# Ensure treatment order
+data$Treatment <- factor(data$Treatment, levels = c("Control", "low", "high"))
+
+# ---------------------------
+# 1) Long-format raw data
+# ---------------------------
+raw_long <- data %>%
+  select(Treatment, Lymphocyte, Neutrophil) %>%
+  pivot_longer(cols = c(Lymphocyte, Neutrophil),
+               names_to = "Cell_type",
+               values_to = "Percent") %>%
+  mutate(Cell_type = factor(Cell_type, levels = c("Lymphocyte", "Neutrophil")))
+
+# ---------------------------
+# 2) Back-transformed model means (beta-binomial) -> percent scale
+# ---------------------------
+emm_lymph <- emmeans(m_lymph_bb, ~ Treatment, type = "response") %>%
+  as.data.frame() %>%
+  transmute(
+    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    Cell_type = factor("Lymphocyte", levels = c("Lymphocyte", "Neutrophil")),
+    mean_pct  = prob * 100,
+    lower_pct = asymp.LCL * 100,
+    upper_pct = asymp.UCL * 100
+  )
+
+emm_neut <- emmeans(m_neut_bb, ~ Treatment, type = "response") %>%
+  as.data.frame() %>%
+  transmute(
+    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    Cell_type = factor("Neutrophil", levels = c("Lymphocyte", "Neutrophil")),
+    mean_pct  = prob * 100,
+    lower_pct = asymp.LCL * 100,
+    upper_pct = asymp.UCL * 100
+  )
+
+emm_both <- bind_rows(emm_lymph, emm_neut)
+
+# ---------------------------
+# 3) Colours (cell-type mapped)
+# ---------------------------
+fill_cells <- c(
+  "Lymphocyte" = "#A8D5BA",  # pastel green
+  "Neutrophil" = "#F5B7B1"   # pastel red
+)
+
+dark_cells <- c(
+  "Lymphocyte" = "#2E8B57",  # dark green
+  "Neutrophil" = "#B22222"   # dark red
+)
+
+dodge_w <- 0.75
+
+# ---------------------------
+# 4) Plot: side-by-side per treatment
+# ---------------------------
+ggplot(raw_long, aes(x = Treatment, y = Percent, fill = Cell_type)) +
+
+  geom_violin(
+    position = position_dodge(width = dodge_w),
+    alpha = 0.30,
+    colour = NA,
+    trim = FALSE
+  ) +
+
+  geom_jitter(
+    aes(colour = Cell_type),
+    position = position_jitterdodge(jitter.width = 0.12, dodge.width = dodge_w),
+    alpha = 0.6,
+    size = 2
+  ) +
+
+  # Model means (do NOT inherit Percent mapping)
+ geom_point(
+  data = emm_both,
+  aes(x = Treatment, y = mean_pct, fill = Cell_type),
+  shape = 21,
+  size = 5,
+  stroke = 1.2,
+  colour = "black",
+  position = position_dodge(width = dodge_w),
+  inherit.aes = FALSE
+) +
+
+  # 95% CI (do NOT inherit Percent mapping)
+  geom_errorbar(
+    data = emm_both,
+    aes(x = Treatment, ymin = lower_pct, ymax = upper_pct, colour = Cell_type),
+    position = position_dodge(width = dodge_w),
+    width = 0.18,
+    linewidth = 1,
+    inherit.aes = FALSE
+  ) +
+
+  scale_fill_manual(values = fill_cells) +
+  scale_colour_manual(values = dark_cells) +
+
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Fluoxetine treatment",
+    y = "Differential leukocyte proportion (%)") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    panel.grid = element_blank(),
+    legend.title = element_blank()
+  )
+
+```
+
