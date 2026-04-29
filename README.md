@@ -1,62 +1,90 @@
-Fluoxetine effects on behaviour, immunity, and microbiome in freshwater fish
-Overview
+# Fluoxetine effects on behaviour, immunity, and microbiome in freshwater fish
 
-This repository contains all data and code used to analyse the effects of the antidepressant fluoxetine on behavioural responses, immune traits, and skin mucus microbiome composition in freshwater fish (Melanotaenia fluviatilis).
+## Overview
 
-The project integrates multiple biological axes to assess how pharmaceutical pollution influences organismal function and potential fitness-related traits.
+This repository contains the data and code used to investigate the effects of the antidepressant fluoxetine on behavioural responses, immune traits, and skin mucus microbiome composition in the freshwater fish *Melanotaenia fluviatilis*.
 
-Repository structure
-.
-├── data/              # Metadata and sample information
-│
-├── scripts/
-│   ├── behaviour/     # Behavioural analyses (GLMMs, plotting)
-│   ├── immunity/      # Immune trait analyses (WBC, N:L ratio)
-│   └── vsearch/       # Microbiome analyses (phyloseq, diversity)
-│
-├── outputs/
-│   └── html_reports/     # Rendered R Markdown reports
-│
-└── README.md
+The study integrates multiple biological axes to assess how pharmaceutical pollution influences organismal function and potential fitness-related processes.
 
-Data description
-Behavioural data: locomotor activity, freezing behaviour, and shelter use
-Immune data: total white blood cell counts and neutrophil (N) ratio
-Microbiome data: skin mucus bacterial community composition derived from 16S rRNA sequencing
+---
 
-Raw data are stored in data/raw/. Processed datasets used for modelling are stored in data/processed/.
+## Repository structure
 
-Analytical workflow
+* `data/`
 
-Analyses were conducted in R (version 4.3.x). Statistical models were primarily fitted using the glmmTMB framework, and microbiome analyses were performed using phyloseq.
+  * `raw/`: original datasets
+  * `processed/`: cleaned datasets used in analyses
+  * `metadata/`: sample information and supporting files
 
-To reproduce the analyses:
+* `scripts/`
 
-Run behavioural analyses:
-scripts/behaviour/
-Run immune analyses:
-scripts/immunity/
-Run microbiome analyses:
-scripts/vsearch/
+  * `01_behaviour/`: behavioural analyses
+  * `02_immunity/`: immune trait analyses
+  * `03_microbiome/`: microbiome analyses
 
-Each folder contains R Markdown (.Rmd) files that generate the outputs stored in outputs/.
+* `outputs/`
 
-Reproducibility
+  * `figures/`: figures used in the manuscript
+  * `tables/`: statistical outputs
+  * `html_reports/`: rendered R Markdown reports
 
-All scripts use relative paths and can be run from the project root directory.
+---
 
-To fully reproduce results:
+## Data description
 
-Ensure required R packages are installed
-Follow the workflow order described above
-Use the processed datasets provided
+This repository includes three main data types:
 
-Citation
+* **Behavioural data**: locomotor activity, freezing behaviour, and shelter use
+* **Immune data**: total white blood cell counts and neutrophil:lymphocyte (N:L) ratio
+* **Microbiome data**: bacterial community composition from skin mucus samples
 
-If you use this repository or associated data, please cite the corresponding manuscript (to be added upon publication).
+Raw data are stored in `data/raw/`, while processed datasets used in statistical analyses are stored in `data/processed/`.
 
-Author
+---
+
+## Analytical workflow
+
+All analyses were conducted in R (v4.3.x).
+
+To reproduce the results:
+
+1. Run scripts in `scripts/01_behaviour/`
+2. Run scripts in `scripts/02_immunity/`
+3. Run scripts in `scripts/03_microbiome/`
+
+Each directory contains R Markdown (`.Rmd`) files that generate the outputs stored in `outputs/`.
+
+---
+
+## Microbiome analysis
+
+Microbiome sequence data were processed prior to R analyses using QIIME2 with the DADA2 pipeline.
+
+The R scripts assume that:
+
+* feature tables
+* taxonomy assignments
+
+are already available in `data/processed/`.
+
+---
+
+## Reproducibility
+
+* All scripts use relative paths
+* Analyses can be run from the project root directory
+* Outputs in the `outputs/` folder correspond to the manuscript results
+
+---
+
+## Author
 
 Gabriel Melhado
-School of Biological Sciences
 Monash University, Australia
+
+---
+
+## Notes
+
+This repository is associated with a manuscript currently in preparation.
+
