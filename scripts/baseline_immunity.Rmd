@@ -44,9 +44,12 @@ mean(data$total_wbc)
 var(data$total_wbc)
 sd(data$total_wbc)
 
+#square root
+data$sqrt_total_wbc <- sqrt(data$total_wbc)
+
 #Model
 m_wbc <- glmmTMB(
-  total_wbc ~ Treatment + Body_mass + (1|Tank_ID),
+  sqrt_total_wbc ~ Treatment + Body_mass + (1|Tank_ID),
   family = gaussian(),
   data = data
 )
@@ -394,6 +397,78 @@ ggplot(raw_long, aes(x = Treatment, y = Percent, fill = Cell_type)) +
     panel.grid = element_blank(),
     legend.title = element_blank()
   )
+
+```
+
+#Absolute number of lymphocyte
+```{r}
+# Create absolute lymphocyte estimate
+data$Abs_Lymphocyte <- (data$Lymphocyte / 100) * data$total_wbc
+
+# Inspect distribution
+hist(data$Abs_Lymphocyte)
+
+# Optional square root transformation if skewed
+data$sqrt_Abs_Lymphocyte <- sqrt(data$Abs_Lymphocyte)
+
+# Fit model
+m_abs_lymph <- glmmTMB(
+  sqrt_Abs_Lymphocyte ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+summary(m_abs_lymph)
+
+# Diagnostics
+res_abs_lymph <- DHARMa::simulateResiduals(m_abs_lymph)
+plot(res_abs_lymph)
+
+DHARMa::testDispersion(res_abs_lymph)
+
+# Type II test
+Anova(m_abs_lymph)
+
+# Estimated marginal means
+emm_abs_lymph <- emmeans(m_abs_lymph, ~ Treatment)
+
+pairs(emm_abs_lymph, adjust = "tukey")
+```
+
+#Absolute number of lymphocyte
+```{r}
+# Create absolute neutrophil abundance
+data$Abs_Neutrophil <- (data$Neutrophil / 100) * data$total_wbc
+
+# Inspect distribution
+hist(data$Abs_Neutrophil)
+
+# Square-root transformation
+data$sqrt_Abs_Neutrophil <- sqrt(data$Abs_Neutrophil)
+
+# Fit model
+m_abs_neut <- glmmTMB(
+  sqrt_Abs_Neutrophil ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+summary(m_abs_neut)
+
+# Residual diagnostics
+res_abs_neut <- DHARMa::simulateResiduals(m_abs_neut)
+
+plot(res_abs_neut)
+
+DHARMa::testDispersion(res_abs_neut)
+
+# Type II Wald tests
+Anova(m_abs_neut)
+
+# Estimated marginal means
+emm_abs_neut <- emmeans(m_abs_neut, ~ Treatment)
+
+pairs(emm_abs_neut, adjust = "tukey")
 
 ```
 
