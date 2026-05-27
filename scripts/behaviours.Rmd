@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Load packages
-pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggeffects, scales)
+pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggeffects, scales, patchwork)
 
 ```
 
@@ -61,6 +61,20 @@ emm <- emmeans(emergence_probability_model, ~ Treatment)
 summary(emm, type = "response")
 
 ```
+
+
+```{r}
+summary(data$Distance_moved)
+summary(data$Time_not_moving)
+summary(data$Time_shelter)
+
+hist(data$Distance_moved)
+hist(data$Time_not_moving)
+hist(data$Time_shelter)
+
+```
+
+
 
 ```{r}
 #Distance_moved
@@ -187,6 +201,22 @@ p_distance <- ggplot() +
   )
 
 print(p_distance)
+
+ggsave(
+  filename = here("figures", "distance_travelled.pdf"),
+  plot = p_distance,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here("figures", "distance_travelled.jpg"),
+  plot = p_distance,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
+
 ```
 
 
@@ -272,7 +302,7 @@ dark_cols <- c(
 )
 
 # 7) Plot on original scale
-ggplot() +
+p_shelter <- ggplot() +
   geom_violin(
     data = data,
     aes(x = Treatment, y = Time_shelter, fill = Treatment),
@@ -305,6 +335,22 @@ ggplot() +
     plot.title = element_text(hjust = 0.5),
     legend.position = "none"
   )
+
+ggsave(
+  filename = here("figures", "shelter.pdf"),
+  plot = p_shelter,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here("figures", "shelter.jpg"),
+  plot = p_shelter,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
+
 ```
 
 
@@ -431,47 +477,79 @@ p_freezing <- ggplot() +
 
 print(p_freezing)
 
-```
+ggsave(
+  filename = here("figures", "Freezing.pdf"),
+  plot = p_freezing,
+  width = 6,
+  height = 5
+)
 
-
-
-##### Behaviours X Immunity
-
-```{r}
-# Energetic trade-off
-m_dist_WBC <- glmmTMB(Distance_moved ~ Treatment + total_wbc + Body_mass + (1 | Tank_ID),
-  data = data,
-  family = tweedie(link = "log"))
-
-summary(m_dist_WBC)
-
-# Diagnosis
-res_m_dist_WBC <- simulateResiduals(m_dist_WBC)
-plot(res_m_dist_WBC)
-
-testDispersion(res_m_dist_WBC)
-testOutliers(res_m_dist_WBC)
-
-car::Anova(m_dist_WBC, type = "II")
+ggsave(
+  filename = here("figures", "Freezing.jpg"),
+  plot = p_freezing,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
 
 ```
 
 
+
 ```{r}
-# Stress-axis
-m_dist_NL <- glmmTMB(Distance_moved ~ Treatment + N.L_ratio + Body_mass + (1 | Tank_ID),
-  data = data,
-  family = tweedie(link = "log"))
+#Figure 1
+# Remove repeated x-axis titles from individual plots
+p_distance_clean <- p_distance +
+  labs(x = NULL, y = "Distance moved (cm)") +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    plot.margin = margin(5, 5, 5, 5)
+  )
 
-# Diagnosis
-res_m_dist_NL <- simulateResiduals(m_dist_NL)
-plot(res_m_dist_NL)
+p_freezing_clean <- p_freezing +
+  labs(x = NULL, y = "Time freezing (s)") +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    plot.margin = margin(5, 5, 5, 5)
+  )
 
-testDispersion(res_m_dist_NL)
-testOutliers(res_m_dist_NL)
+p_shelter_clean <- p_shelter +
+  labs(x = NULL, y = "Time spent in shelter (s)") +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    plot.margin = margin(5, 5, 5, 5)
+  )
 
-summary(m_dist_NL)
-Anova(m_dist_NL)
+# Combine plots
+figure_behaviour <- (
+  p_distance_clean + p_freezing_clean + p_shelter_clean
+) +
+  plot_annotation(
+    tag_levels = "A",
+    caption = "Fluoxetine treatment"
+  ) &
+  theme(
+    plot.tag = element_text(size = 16, face = "bold"),
+    plot.caption = element_text(size = 14, hjust = 0.5),
+    legend.position = "none"
+  )
+
+figure_behaviour
+
+ggsave(
+  filename = here("figures", "behaviour_figure.pdf"),
+  plot = figure_behaviour,
+  width = 12,
+  height = 4.5
+)
+
+ggsave(
+  filename = here("figures", "behaviour_figure.jpg"),
+  plot = figure_behaviour,
+  width = 12,
+  height = 4.5,
+  dpi = 600
+)
 
 ```
 

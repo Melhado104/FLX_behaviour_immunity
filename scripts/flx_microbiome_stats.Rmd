@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Load packages
-pacman::p_load(readr, readxl, here, dplyr, tidyr, tidyverse, forcats, scales, RColorBrewer, grid, janitor, stringr, tibble, phyloseq, vegan, microbiome, microViz, ggside, pairwiseAdonis, DESeq2, ggplot2, lme4, lmerTest, glmmTMB)
+pacman::p_load(readr, readxl, here, dplyr, tidyr, tidyverse, forcats, scales, RColorBrewer, grid, janitor, stringr, tibble, phyloseq, vegan, microbiome, microViz, ggside, pairwiseAdonis, DESeq2, ggplot2, lme4, lmerTest, glmmTMB, patchwork)
 
 ```
 
@@ -47,14 +47,14 @@ mtd_final <- sample_data(meta)
 ```{r}
 # Feature table (ASVs count and taxonomy info using Naive Bayes classifier)
 biom_NB <- import_biom(
-  "data/feature-table-tax.biom",
-  treefilename = "data/phylotree_mafft_rooted.nwk"
+  "C:/Users/gmel0011/Documents/microbiome/data/feature-table-tax.biom",
+  treefilename = "C:/Users/gmel0011/Documents/microbiome/data/phylotree_mafft_rooted.nwk"
 )
 
 # Feature table (ASVs count and taxonomy info using VSEARCH)
 biom_VSEARCH <- import_biom(
-  "data/feature-table-tax_vsearch.biom",
-  treefilename = "data/phylotree_mafft_rooted.nwk"
+  "C:/Users/gmel0011/Documents/microbiome/data/feature-table-tax_vsearch.biom",
+  treefilename = "C:/Users/gmel0011/Documents/microbiome/data/phylotree_mafft_rooted.nwk"
 )
 ```
 
@@ -131,6 +131,32 @@ nsamples(ps_NB) # 129 -> all good
 # Check the number of reads that were left after filtering
 sum(taxa_sums(ps_NB)) / sum(taxa_sums(ps_NB_raw)) * 100
 # 79.5% of reads have been retained.
+```
+```{r}
+summary(sample_sums(ps_NB))
+mean(sample_sums(ps_NB))
+range(sample_sums(ps_NB))
+sd(sample_sums(ps_NB))
+```
+```{r}
+# Check sequencing depth per sample
+sample_depth <- sample_sums(ps_NB)
+
+# Identify low-depth samples
+low_depth_samples <- names(sample_depth[sample_depth < 1000])
+low_depth_samples
+
+# Remove samples with <1000 reads
+ps_NB <- prune_samples(sample_depth >= 1000, ps_NB)
+
+# Remove taxa/ASVs that are now absent after sample filtering
+ps_NB <- prune_taxa(taxa_sums(ps_NB_filt) > 0, ps_NB_filt)
+
+# Check new sequencing depth summary
+summary(sample_sums(ps_NB))
+mean(sample_sums(ps_NB))
+range(sample_sums(ps_NB))
+sd(sample_sums(ps_NB))
 ```
 
 ```{r}
@@ -233,10 +259,15 @@ summary(m_simpson)
 
 ```{r}
 
-## Final plots
-png("./alpha_temp2.png", width = 600, height = 300, units = "mm", res = 300)
+## Reorder treatment levels
+alpha_mtd$treatment <- factor(
+  alpha_mtd$treatment,
+  levels = c("C", "L", "H"),
+  labels = c("Control", "Low", "High")
+)
 
-alpha_mtd %>%
+## Final plots
+p_alpha <- alpha_mtd %>%
   tidyr::pivot_longer(cols = c("Observed", "Shannon", "Simpson"),
                       names_to = "metric",
                       values_to = "value") %>%
@@ -256,9 +287,9 @@ alpha_mtd %>%
   labs(x = "", y = "") +
   facet_wrap(~metric, scales = "free") +
   scale_colour_manual(values = c(
-    "C" = "#7FA6B8",
-    "L"     = "#F3AD7A",
-    "H"    = "#EC6C31"
+    "Control" = "#2E8B57",
+    "Low"     = "#C9A227",
+    "High"    = "#B22222"
   )) +
   theme_bw() +
   theme(
@@ -272,7 +303,25 @@ alpha_mtd %>%
     panel.spacing = unit(1.5, "lines")
   )
 
-dev.off()
+
+
+print(p_alpha)
+
+
+ggsave(
+  filename = here::here("figures", "alpha_temp2.png"),
+  plot = p_alpha,
+  width = 12,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  filename = here::here("figures", "alpha_diversity.pdf"),
+  plot = p_alpha,
+  width = 12,
+  height = 6
+)
 
 ```
 
@@ -393,8 +442,7 @@ dev.off()
 
 It looks like there might be some separate clustering, suggesting possible differences in microbial communities according to treatment. We'll use a permutational multivariate analysis of variance (PERMANOVA) to test whether the samples cluster beyond that expected. Note that PERMANOVA is analogous to ANOVA, but is for multivariate distance data.
 
-## ❓ PAnalyERMANOVA:
-
+## ❓ Permanova
 ```{r}
 # Generate Euclidean distance matrix on the clr-transformed ASV data
 clr_dist_matrix <- phyloseq::distance(ps_clr, method = "euclidean") 
@@ -971,9 +1019,9 @@ p_pcoa <- ggplot(pcoa_df, aes(x = PCoA1, y = PCoA2, colour = treatment)) +
   ) +
   
   scale_colour_manual(values = c(
-    "Control" = "#1b9e77",
-    "Low" = "#d95f02",
-    "High" = "#7570b3"
+    "Control" = "#2E8B57",
+    "Low" = "#C9A227",
+    "High" = "#B22222"
   )) +
   
   labs(
@@ -1013,5 +1061,36 @@ ggsave(
 )
 ```
 
+```{r}
+# Merge figures
+figure_microbiome <- (
+  p_pcoa +
+  p_phylum_mean +
+  plot_layout(widths = c(1.4, 1.6))
+) +
+  plot_annotation(tag_levels = "A") &
+  theme(
+    plot.tag = element_text(
+      size = 18,
+      face = "bold"
+    )
+  )
 
+figure_microbiome
+
+ggsave(
+  filename = here("figures", "beta_phylum.pdf"),
+  plot = figure_microbiome,
+  width = 12,
+  height = 5
+)
+
+ggsave(
+  filename = here("figures", "beta_phylum.jpg"),
+  plot = figure_microbiome,
+  width = 12,
+  height = 5,
+  dpi = 600
+)
+```
 

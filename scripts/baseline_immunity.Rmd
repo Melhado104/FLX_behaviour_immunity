@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Load packages
-pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggplot2)
+pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggplot2, patchwork)
 
 ```
 
@@ -67,74 +67,118 @@ pairs(emm_wbc, adjust = "tukey")
 ```
 
 ```{r}
-#Plotting WBC
-data$Treatment <- factor(data$Treatment,
-                         levels = c("Control", "low", "high"))
+# Plotting WBC
 
+# 2) Refit model with updated Treatment factor
+m_wbc <- glmmTMB(
+  sqrt_total_wbc ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+# 3) Estimated marginal means
 emm_wbc <- emmeans(m_wbc, ~ Treatment)
 
 emm_df <- as.data.frame(emm_wbc)
-emm_df
-emm_df$Treatment <- factor(emm_df$Treatment,
-                           levels = c("Control", "low", "high"))
 
+# 4) Back-transform estimates to original WBC scale
+emm_df <- emm_df %>%
+  mutate(
+    mean_wbc  = emmean^2,
+    lower_wbc = lower.CL^2,
+    upper_wbc = upper.CL^2
+  )
 
-# Pastel palette
+# 5) Colour palettes
 pastel_cols <- c(
-  "Control" = "#A8D5BA",  
-  "low"     = "#F9E79F",  
-  "high"    = "#F5B7B1" 
+  "Control" = "#A8D5BA",
+  "low"     = "#F9E79F",
+  "high"    = "#F5B7B1"
 )
 
-# Darker colours for model estimates
 dark_cols <- c(
   "Control" = "#2E8B57",
   "low"     = "#C9A227",
   "high"    = "#B22222"
 )
 
-ggplot() +
-  
-  # Violin
-  geom_violin(data = data,
-              aes(x = Treatment, y = total_wbc, fill = Treatment),
-              alpha = 0.35,
-              colour = NA,
-              trim = FALSE) +
-  
-  # Raw points
-  geom_jitter(data = data,
-              aes(x = Treatment, y = total_wbc, colour = Treatment),
-              width = 0.15,
-              alpha = 0.6,
-              size = 2) +
-  
-  # Model estimated means
-  geom_point(data = emm_df,
-             aes(x = Treatment, y = emmean, colour = Treatment),
-             size = 4) +
-  
-  # Confidence intervals
-  geom_errorbar(data = emm_df,
-                aes(x = Treatment,
-                    ymin = lower.CL,
-                    ymax = upper.CL,
-                    colour = Treatment),
-                width = 0.2,
-                linewidth = 1) +
-  
+# 6) Plot
+p_wbc <- ggplot() +
+
+  geom_violin(
+    data = data,
+    aes(x = Treatment, y = total_wbc, fill = Treatment),
+    alpha = 0.20,
+    colour = NA,
+    trim = FALSE
+  ) +
+
+  geom_jitter(
+    data = data,
+    aes(x = Treatment, y = total_wbc, colour = Treatment),
+    width = 0.15,
+    alpha = 0.6,
+    size = 2
+  ) +
+
+  geom_errorbar(
+    data = emm_df,
+    aes(
+      x = Treatment,
+      ymin = lower_wbc,
+      ymax = upper_wbc,
+      colour = Treatment
+    ),
+    width = 0.25,
+    linewidth = 1.2
+  ) +
+
+  geom_point(
+    data = emm_df,
+    aes(
+      x = Treatment,
+      y = mean_wbc,
+      fill = Treatment
+    ),
+    shape = 21,
+    size = 5,
+    stroke = 1.2,
+    colour = "black"
+  ) +
+
   scale_colour_manual(values = dark_cols) +
   scale_fill_manual(values = pastel_cols) +
-  
+
   theme_bw(base_size = 14) +
-  labs(x = "Fluoxetine treatment",
-       y = "Total white blood cells") +
+
+  labs(
+    x = "Fluoxetine treatment",
+    y = "White blood cell count"
+  ) +
+
   theme(
-    plot.title = element_text(hjust = 0.5),
     panel.grid = element_blank(),
     legend.position = "none"
   )
 
+# Display plot
+p_wbc
+
+# 7) Save figure
+ggsave(
+  filename = here::here("figures", "total_wbc.pdf"),
+  plot = p_wbc,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here::here("figures", "total_wbc.jpg"),
+  plot = p_wbc,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
 
 ```
 
@@ -167,37 +211,49 @@ pairs(emm_NL, adjust = "tukey")
 ```
 
 ```{r}
-# Plotting H/L ratio
-# Ensure treatment order (same as WBC figure)
-data$Treatment <- factor(data$Treatment, levels = c("Control", "low", "high"))
+# Plotting N:L ratio
 
-# Pastel palette (violin fills)
+# 1) Ensure treatment order BEFORE fitting the model
+data$Treatment <- factor(
+  data$Treatment,
+  levels = c("Control", "low", "high")
+)
+
+# 2) Refit model after setting treatment order
+m_NL <- glmmTMB(
+  log_NL ~ Treatment + Body_mass + (1 | Tank_ID),
+  family = gaussian(),
+  data = data
+)
+
+# 3) Colours
 pastel_cols <- c(
   "Control" = "#A8D5BA",
   "low"     = "#F9E79F",
   "high"    = "#F5B7B1"
 )
 
-# Darker palette (mean points + CIs)
 dark_cols <- c(
   "Control" = "#2E8B57",
   "low"     = "#C9A227",
   "high"    = "#B22222"
 )
 
-# Get emmeans on the MODEL SCALE (log scale), then back-transform manually
-emm_NL <- emmeans(m_NL, ~ Treatment) %>% as.data.frame()
-
-emm_NL_df <- emm_NL %>%
-  mutate(
+# 4) Get emmeans on log scale and back-transform
+emm_NL_df <- emmeans(m_NL, ~ Treatment) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
     Treatment = factor(Treatment, levels = c("Control", "low", "high")),
     emmean_bt = exp(emmean),
     lower_bt  = exp(lower.CL),
     upper_bt  = exp(upper.CL)
   )
 
-# Plot: violin + jitter (raw) + model means + 95% CI (back-transformed)
-ggplot() +
+# Check estimates before plotting
+emm_NL_df
+
+# 5) Plot
+p_nl_ratio <- ggplot() +
 
   geom_violin(
     data = data,
@@ -215,31 +271,59 @@ ggplot() +
     size = 2
   ) +
 
-  geom_point(
-    data = emm_NL_df,
-    aes(x = Treatment, y = emmean_bt, colour = Treatment),
-    size = 4
-  ) +
-
   geom_errorbar(
     data = emm_NL_df,
-    aes(x = Treatment, ymin = lower_bt, ymax = upper_bt, colour = Treatment),
+    aes(
+      x = Treatment,
+      ymin = lower_bt,
+      ymax = upper_bt,
+      colour = Treatment
+    ),
     width = 0.2,
     linewidth = 1
+  ) +
+
+  geom_point(
+    data = emm_NL_df,
+    aes(x = Treatment, y = emmean_bt, fill = Treatment),
+    shape = 21,
+    size = 5,
+    stroke = 1.2,
+    colour = "black"
   ) +
 
   scale_fill_manual(values = pastel_cols) +
   scale_colour_manual(values = dark_cols) +
 
   theme_bw(base_size = 14) +
+
   labs(
     x = "Fluoxetine treatment",
-    y = "N/L ratio") +
+    y = "N:L ratio"
+  ) +
+
   theme(
-    plot.title = element_text(hjust = 0.5),
     panel.grid = element_blank(),
     legend.position = "none"
   )
+
+p_nl_ratio
+
+# Save
+ggsave(
+  filename = here::here("figures", "nl_ratio.pdf"),
+  plot = p_nl_ratio,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here::here("figures", "nl_ratio.jpg"),
+  plot = p_nl_ratio,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
 ```
 
 
@@ -347,7 +431,7 @@ dodge_w <- 0.75
 # ---------------------------
 # 4) Plot: side-by-side per treatment
 # ---------------------------
-ggplot(raw_long, aes(x = Treatment, y = Percent, fill = Cell_type)) +
+p_lymphocyte_neutrophils <- ggplot(raw_long, aes(x = Treatment, y = Percent, fill = Cell_type)) +
 
   geom_violin(
     position = position_dodge(width = dodge_w),
@@ -398,6 +482,23 @@ ggplot(raw_long, aes(x = Treatment, y = Percent, fill = Cell_type)) +
     legend.title = element_blank()
   )
 
+print(p_lymphocyte_neutrophils)
+
+ggsave(
+  filename = here::here("figures", "lymphocytes_neutrophils.pdf"),
+  plot = p_lymphocyte_neutrophils,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here::here("figures", "lymphocytes_neutrophils.jpg"),
+  plot = p_lymphocyte_neutrophils,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
+
 ```
 
 #Absolute number of lymphocyte
@@ -435,7 +536,7 @@ emm_abs_lymph <- emmeans(m_abs_lymph, ~ Treatment)
 pairs(emm_abs_lymph, adjust = "tukey")
 ```
 
-#Absolute number of lymphocyte
+#Absolute number of Neutrophil
 ```{r}
 # Create absolute neutrophil abundance
 data$Abs_Neutrophil <- (data$Neutrophil / 100) * data$total_wbc
@@ -470,5 +571,223 @@ emm_abs_neut <- emmeans(m_abs_neut, ~ Treatment)
 
 pairs(emm_abs_neut, adjust = "tukey")
 
+```
+
+```{r}
+# Layout:
+# A | B
+# -------
+# C
+
+figure_immunity <- (
+  (p_wbc | p_abs_lymphocyte_neutrophils) /
+  p_nl_ratio
+) +
+  plot_annotation(tag_levels = "A") &
+  theme(
+    plot.tag = element_text(
+      size = 18,
+      face = "bold"
+    )
+  )
+
+# Display
+figure_immunity
+
+ggsave(
+  filename = here::here("figures", "immune_figure.pdf"),
+  plot = figure_immunity,
+  width = 9,
+  height = 15
+)
+
+ggsave(
+  filename = here::here("figures", "immune_figure.jpg"),
+  plot = figure_immunity,
+  width = 8,
+  height = 8,
+  dpi = 600
+)
+```
+
+```{r}
+# Plotting absolute lymphocytes and neutrophils
+
+# Ensure treatment order
+data$Treatment <- factor(
+  data$Treatment,
+  levels = c("Control", "low", "high")
+)
+
+# ---------------------------
+# 1) Long-format raw data
+# ---------------------------
+raw_abs_long <- data %>%
+  dplyr::select(Treatment, Abs_Lymphocyte, Abs_Neutrophil) %>%
+  tidyr::pivot_longer(
+    cols = c(Abs_Lymphocyte, Abs_Neutrophil),
+    names_to = "Cell_type",
+    values_to = "Count"
+  ) %>%
+  dplyr::mutate(
+    Cell_type = dplyr::recode(
+      Cell_type,
+      "Abs_Lymphocyte" = "Lymphocyte",
+      "Abs_Neutrophil" = "Neutrophil"
+    ),
+    Cell_type = factor(
+      Cell_type,
+      levels = c("Lymphocyte", "Neutrophil")
+    )
+  )
+
+# ---------------------------
+# 2) Back-transformed model means
+# ---------------------------
+emm_lymph_abs <- emmeans(m_abs_lymph, ~ Treatment) %>%
+  as.data.frame() %>%
+  dplyr::transmute(
+    Treatment = factor(
+      Treatment,
+      levels = c("Control", "low", "high")
+    ),
+    Cell_type = factor(
+      "Lymphocyte",
+      levels = c("Lymphocyte", "Neutrophil")
+    ),
+    mean_count  = emmean^2,
+    lower_count = lower.CL^2,
+    upper_count = upper.CL^2
+  )
+
+emm_neut_abs <- emmeans(m_abs_neut, ~ Treatment) %>%
+  as.data.frame() %>%
+  dplyr::transmute(
+    Treatment = factor(
+      Treatment,
+      levels = c("Control", "low", "high")
+    ),
+    Cell_type = factor(
+      "Neutrophil",
+      levels = c("Lymphocyte", "Neutrophil")
+    ),
+    mean_count  = emmean^2,
+    lower_count = lower.CL^2,
+    upper_count = upper.CL^2
+  )
+
+emm_abs_both <- dplyr::bind_rows(
+  emm_lymph_abs,
+  emm_neut_abs
+)
+
+# ---------------------------
+# 3) Colours
+# ---------------------------
+fill_cells <- c(
+  "Lymphocyte" = "#A8D5BA",
+  "Neutrophil" = "#F5B7B1"
+)
+
+dark_cells <- c(
+  "Lymphocyte" = "#2E8B57",
+  "Neutrophil" = "#B22222"
+)
+
+dodge_w <- 0.75
+
+# ---------------------------
+# 4) Plot
+# ---------------------------
+p_abs_lymphocyte_neutrophils <- ggplot(
+  raw_abs_long,
+  aes(x = Treatment, y = Count, fill = Cell_type)
+) +
+
+  geom_violin(
+    position = position_dodge(width = dodge_w),
+    alpha = 0.30,
+    colour = NA,
+    trim = FALSE
+  ) +
+
+  geom_jitter(
+    aes(colour = Cell_type),
+    position = position_jitterdodge(
+      jitter.width = 0.12,
+      dodge.width = dodge_w
+    ),
+    alpha = 0.6,
+    size = 2
+  ) +
+
+  geom_errorbar(
+    data = emm_abs_both,
+    aes(
+      x = Treatment,
+      ymin = lower_count,
+      ymax = upper_count,
+      colour = Cell_type
+    ),
+    position = position_dodge(width = dodge_w),
+    width = 0.18,
+    linewidth = 1,
+    inherit.aes = FALSE
+  ) +
+
+  geom_point(
+    data = emm_abs_both,
+    aes(
+      x = Treatment,
+      y = mean_count,
+      fill = Cell_type
+    ),
+    shape = 21,
+    size = 5,
+    stroke = 1.2,
+    colour = "black",
+    position = position_dodge(width = dodge_w),
+    inherit.aes = FALSE
+  ) +
+
+  scale_fill_manual(values = fill_cells) +
+  scale_colour_manual(values = dark_cells) +
+
+  theme_bw(base_size = 14) +
+
+  labs(
+    x = "Fluoxetine treatment",
+    y = "Absolute leukocyte count"
+  ) +
+
+  theme(
+    panel.grid = element_blank(),
+    legend.title = element_blank()
+  )
+
+# Display
+p_abs_lymphocyte_neutrophils
+
+# Save
+ggsave(
+  filename = here::here(
+    "figures",
+    "absolute_lymphocytes_neutrophils.pdf"
+  ),
+  plot = p_abs_lymphocyte_neutrophils,
+  width = 6,
+  height = 5
+)
+
+ggsave(
+  filename = here::here(
+    "figures",
+    "absolute_lymphocytes_neutrophils.jpg"
+  ),
+  plot = p_abs_lymphocyte_neutrophils,
+  width = 6,
+  height = 5,
+  dpi = 600
+)
 ```
 
