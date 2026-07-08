@@ -100,6 +100,7 @@ Anova(m2_distance_moved)
 
 ```{r}
 # Plotting Distance_moved
+
 # 1) Ensure treatment order
 data$Treatment <- factor(
   data$Treatment,
@@ -161,7 +162,7 @@ p_distance <- ggplot() +
     aes(x = Treatment, y = Distance_moved, fill = Treatment),
     alpha = 0.20,
     colour = NA,
-    trim = FALSE
+    trim = TRUE
   ) +
   geom_jitter(
     data = data,
@@ -186,13 +187,15 @@ p_distance <- ggplot() +
   ) +
   scale_fill_manual(values = pastel_cols) +
   scale_colour_manual(values = dark_cols) +
-  scale_y_continuous(trans = scales::pseudo_log_trans(base = 10),
-  breaks = c(0, 1000, 10000, 50000),
-  labels = scales::comma) +
+  scale_y_continuous(
+    breaks = seq(0, 3000, by = 500),
+    labels = scales::comma
+  ) +
+  coord_cartesian(ylim = c(0, 3000)) +
   theme_bw(base_size = 14) +
   labs(
     x = "Fluoxetine treatment",
-    y = "Distance moved"
+    y = "Distance moved (cm)"
   ) +
   theme(
     panel.grid = element_blank(),

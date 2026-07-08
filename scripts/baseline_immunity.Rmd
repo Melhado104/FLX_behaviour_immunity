@@ -37,6 +37,24 @@ hist(data$Monocyte)
 hist(data$`N.L_ratio`)
 
 ```
+```{r}
+# percentage of total leukocytes represented by monocytes
+# Total leukocytes counted
+total_leukocytes <- sum(
+  data$Lymphocyte +
+  data$Neutrophil +
+  data$Monocyte,
+  na.rm = TRUE
+)
+
+# Percentage of monocytes
+monocyte_percent <- sum(data$Monocyte, na.rm = TRUE) /
+  total_leukocytes * 100
+
+monocyte_percent
+```
+
+
 
 ```{r}
 #WBC
@@ -68,6 +86,15 @@ pairs(emm_wbc, adjust = "tukey")
 
 ```{r}
 # Plotting WBC
+
+# Set treatment order
+data <- data %>%
+  mutate(
+    Treatment = factor(
+      Treatment,
+      levels = c("Control", "low", "high")
+    )
+  )
 
 # 2) Refit model with updated Treatment factor
 m_wbc <- glmmTMB(
@@ -576,12 +603,9 @@ pairs(emm_abs_neut, adjust = "tukey")
 ```{r}
 # Layout:
 # A | B
-# -------
-# C
 
 figure_immunity <- (
-  (p_wbc | p_abs_lymphocyte_neutrophils) /
-  p_nl_ratio
+  p_wbc | p_abs_lymphocyte_neutrophils
 ) +
   plot_annotation(tag_levels = "A") &
   theme(
@@ -598,14 +622,14 @@ ggsave(
   filename = here::here("figures", "immune_figure.pdf"),
   plot = figure_immunity,
   width = 9,
-  height = 15
+  height = 4.5
 )
 
 ggsave(
   filename = here::here("figures", "immune_figure.jpg"),
   plot = figure_immunity,
-  width = 8,
-  height = 8,
+  width = 9,
+  height = 4.5,
   dpi = 600
 )
 ```
@@ -685,13 +709,13 @@ emm_abs_both <- dplyr::bind_rows(
 # 3) Colours
 # ---------------------------
 fill_cells <- c(
-  "Lymphocyte" = "#A8D5BA",
-  "Neutrophil" = "#F5B7B1"
-)
+  "Lymphocyte" = "#FC8D62",
+  "Neutrophil" = "#8DA0CB"
+) 
 
 dark_cells <- c(
-  "Lymphocyte" = "#2E8B57",
-  "Neutrophil" = "#B22222"
+  "Lymphocyte" = "#D55E00",
+  "Neutrophil" = "#4C72B0"
 )
 
 dodge_w <- 0.75
