@@ -18,16 +18,19 @@ The study integrates multiple biological axes to assess how pharmaceutical pollu
 
 * `scripts/`
 
-  * `01_behaviour/`: behavioural analyses
-  * `02_immunity/`: immune trait analyses
-  * `03_microbiome/`: microbiome analyses
+  * `behaviours/`: behavioural analyses
+  * `baseline_immunity/`: immune trait analyses
+  * `flx_microbiome_stats/`: microbiome analyses
 
 * `outputs/`
 
-  * `figures/`: figures used in the manuscript
-  * `tables/`: statistical outputs
-  * `html_reports/`: rendered R Markdown reports
+   * `html_files/`: rendered R Markdown reports
 
+
+* `figures/`
+
+   * `jpg_files/`: figures saved as JPG
+   * `pdf_files/`: figures saved as PDF
 ---
 
 ## Data description
@@ -48,9 +51,9 @@ All analyses were conducted in R (v4.3.x).
 
 To reproduce the results:
 
-1. Run scripts in `scripts/01_behaviour/`
-2. Run scripts in `scripts/02_immunity/`
-3. Run scripts in `scripts/03_microbiome/`
+1. Run scripts in `scripts/behaviours/`
+2. Run scripts in `scripts/baseline_immunity/`
+3. Run scripts in `scripts/flx_microbiome_stats/`
 
 Each directory contains R Markdown (`.Rmd`) files that generate the outputs stored in `outputs/`.
 
@@ -58,7 +61,7 @@ Each directory contains R Markdown (`.Rmd`) files that generate the outputs stor
 
 ## Microbiome analysis
 
-Microbiome sequence data were processed prior to R analyses using QIIME2 with the DADA2 pipeline.
+Microbiome sequence data were processed prior to R analyses using QIIME2 with the DADA2 pipeline by the company AGRF Australia.
 
 The R scripts assume that:
 
