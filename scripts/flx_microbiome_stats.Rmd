@@ -12,10 +12,11 @@ knitr::opts_chunk$set(echo = TRUE)
 # SETUP
 
 ## Libraries
+### Load all packages required for data import, manipulation, microbiome processing, statistical modelling, visualisation, and file management.
 
 ```{r}
 # Load packages
-pacman::p_load(readr, readxl, here, dplyr, tidyr, tidyverse, forcats, scales, RColorBrewer, grid, janitor, stringr, tibble, phyloseq, vegan, microbiome, microViz, ggside, pairwiseAdonis, DESeq2, ggplot2, lme4, lmerTest, glmmTMB, patchwork)
+pacman::p_load(readr, readxl, here, dplyr, tidyr, tidyverse, forcats, scales, RColorBrewer, grid, janitor, stringr, tibble, phyloseq, vegan, microbiome, microViz, ggside, pairwiseAdonis, DESeq2, ggplot2, lme4, lmerTest, glmmTMB, patchwork, Maaslin2, BiocManager)
 
 ```
 
@@ -23,8 +24,7 @@ pacman::p_load(readr, readxl, here, dplyr, tidyr, tidyverse, forcats, scales, RC
 # Data
 
 ## Data wrangling
-
-### Metadata
+### Import the experimental metadata and format sample identifiers so they match the identifiers used in the sequencing files. The sample ID column is then converted to row names and stored as a sample_data object for integration with phyloseq.
 
 ```{r}
 # Read and prepare metadata
@@ -42,28 +42,34 @@ mtd_final <- sample_data(meta)
 
 ```
 
-### Sequencing information
+## Sequencing information
+### Import the ASV abundance table, taxonomic assignments, and rooted phylogenetic tree produced by the sequencing pipeline. Two alternative taxonomic-classification outputs are imported here so their results can be compared before selecting one for downstream analyses.
 
 ```{r}
 # Feature table (ASVs count and taxonomy info using Naive Bayes classifier)
 biom_NB <- import_biom(
-  "C:/Users/gmel0011/Documents/microbiome/data/feature-table-tax.biom",
-  treefilename = "C:/Users/gmel0011/Documents/microbiome/data/phylotree_mafft_rooted.nwk"
+  here("data", "feature-table-tax.biom"),
+  treefilename = here("data", "phylotree_mafft_rooted.nwk")
 )
 
 # Feature table (ASVs count and taxonomy info using VSEARCH)
 biom_VSEARCH <- import_biom(
-  "C:/Users/gmel0011/Documents/microbiome/data/feature-table-tax_vsearch.biom",
-  treefilename = "C:/Users/gmel0011/Documents/microbiome/data/phylotree_mafft_rooted.nwk"
+  here("data", "feature-table-tax_vsearch.biom"),
+  treefilename = here("data", "phylotree_mafft_rooted.nwk")
 )
+
 ```
 
-# Generate phyloseq objects. Note that the Naive Bayes and VSEARCH classifications returned similar ASV-level outputs/taxonomic patterns. We therefore proceeded with the Naive Bayes classification for downstream analyses.
+# Generate phyloseq objects
 
-# ps_tss will be used for plots and alpha/beta diversity.
-# ps_NB includes raw counts and will be used for differential abundance analysis.
+### Note that the Naive Bayes and VSEARCH classifications returned similar ASV-level outputs/taxonomic patterns. We therefore proceeded with the Naive Bayes classification for downstream analyses.
 
-### Phyloseq object
+## ps_tss will be used for plots and alpha/beta diversity.
+## ps_NB includes raw counts and will be used for differential abundance analysis.
+
+# Phyloseq object
+
+### Combine the sequencing data with the experimental metadata to create the initial phyloseq object. Taxonomic rank names are standardised, and a total-sum-scaled copy is produced by converting each sample's counts to relative abundances.
 
 ```{r}
 # Merge feature table with metadata to create phyloseq object
@@ -77,9 +83,10 @@ ps_tss_raw <- transform_sample_counts(ps_NB_raw, function(x){if(sum(x) == 0){x} 
 
 ```
 
-## Data filtering
+# Data filtering
 
-### Taxonomy-based filtering
+## Taxonomy-based filtering
+### Apply taxonomy-based quality control to both the relative-abundance and raw-count phyloseq objects. Features lacking phylum-level classification or assigned to chloroplasts, mitochondria, or Chlorophyta are removed because they are not part of the target bacterial community.
 
 
 ```{r}
@@ -100,9 +107,9 @@ ps_NB <- ps_NB_raw %>%
 
 ```
 
-#### Prevalence-based filtering
-
-# Features that show up in only a few samples may not represent real biological diversity but rather PCR/sequencing errors (such as PCR chimeras) or reagent contaminants.
+## Prevalence-based filtering
+### Features that show up in only a few samples may not represent real biological diversity but rather PCR/sequencing errors (such as PCR chimeras) or reagent contaminants.
+### Remove low-prevalence ASVs that occur in fewer than 10% of samples. This step reduces the influence of extremely rare features that are more likely to reflect sequencing artefacts, contaminants, or poorly supported biological signals.
 
 ```{r}
 # Prevalence filter (remove features present in less than 10% of samples)
@@ -113,31 +120,37 @@ ps_NB <- filter_taxa(ps_NB, function(x) sum(x > 0) >= prev_cut, prune = TRUE)
 
 
 ### Check filtering
+### Compare the number of ASVs before and after filtering. This provides a direct check of how strongly the taxonomic and prevalence filters reduced the feature table.
 
 ```{r}
 # Check the number of taxa that remain after filtering
-ntaxa(ps_NB_raw) # Pre-filtering = 15768
-ntaxa(ps_NB) # Post-filtering = 261
+ntaxa(ps_NB_raw) 
+ntaxa(ps_NB) 
 
 ```
 
 ```{r}
 # Check that no samples have been removed
-nsamples(ps_NB_raw) # 129 -> all good
-nsamples(ps_NB) # 129 -> all good
+nsamples(ps_NB_raw)
+nsamples(ps_NB) 
 ```
 
 ```{r}
 # Check the number of reads that were left after filtering
 sum(taxa_sums(ps_NB)) / sum(taxa_sums(ps_NB_raw)) * 100
-# 79.5% of reads have been retained.
+
 ```
+
 ```{r}
 summary(sample_sums(ps_NB))
 mean(sample_sums(ps_NB))
 range(sample_sums(ps_NB))
 sd(sample_sums(ps_NB))
+
 ```
+### Identify samples with fewer than 1,000 retained reads, remove them from the dataset, and then prune ASVs that become absent after sample removal. The sequencing-depth distribution is recalculated to confirm the properties of the final filtered object.
+
+
 ```{r}
 # Check sequencing depth per sample
 sample_depth <- sample_sums(ps_NB)
@@ -150,7 +163,7 @@ low_depth_samples
 ps_NB <- prune_samples(sample_depth >= 1000, ps_NB)
 
 # Remove taxa/ASVs that are now absent after sample filtering
-ps_NB <- prune_taxa(taxa_sums(ps_NB_filt) > 0, ps_NB_filt)
+ps_NB <- prune_taxa(taxa_sums(ps_NB) > 0, ps_NB)
 
 # Check new sequencing depth summary
 summary(sample_sums(ps_NB))
@@ -158,6 +171,7 @@ mean(sample_sums(ps_NB))
 range(sample_sums(ps_NB))
 sd(sample_sums(ps_NB))
 ```
+### Visualise ASV prevalence before and after filtering. The histograms show how many samples each ASV occurs in and help confirm that the low-prevalence portion of the distribution has been removed.
 
 ```{r}
 # Plot histograms to ensure that early peaks have been removed
@@ -176,7 +190,7 @@ Essentially, alpha diversity measures within-sample diversity across treatments.
 
 Initial plot: Use the phyloseq library to investigate the alpha diversity measure of each sample across the three treatment groups. Note that we will only use a subset of these measures (explained in further detail below).
 
-## 📈  Initial plot
+## Initial plot
 
 ```{r}
 
@@ -187,7 +201,7 @@ plot_richness(ps_NB, x="treatment", color="treatment",
 
 ```
 
-## 🧮 Calculate alpha diversity
+## Calculate alpha diversity
 
 There are many different measures of alpha diversity:
 - Observed: The actual number of unique ASVs in a sample. Measures taxonomic richness.
@@ -197,6 +211,7 @@ There are many different measures of alpha diversity:
 - Fisher: Takes into account both the number of species (species richness) and the evenness of their distribution.
 - Chao1: Estimates the true number of species (species richness) in a community or sample, especially when some species are rare and may not be observed in the sample. It takes into account both the number of observed species and the number of rare or singleton species to provide an estimate of total species richness.
 
+### Calculate sample-level alpha-diversity metrics and merge them with the experimental metadata. Sample identifiers are standardised before merging so that each diversity estimate is correctly linked to its treatment, tank, and other covariates.
 
 ```{r}
 # Get alpha values for each sample
@@ -215,9 +230,10 @@ alpha_mtd <- merge(x = IDs, y = alpha, by = "sample")
 
 ```
 
-## ❓ Analysis:
+## Analysis:
 Is there evidence that alpha values differ across treatment groups? Note that we only report results from Observed, Shannon, and Simpson measures of diversity.
 
+###Test whether alpha diversity differs among fluoxetine treatments while accounting for sequencing depth and tank-level non-independence. Observed richness is modelled with a negative-binomial GLMM, whereas Shannon and Simpson diversity are analysed with linear mixed-effects models.
 
 ```{r}
 #Tank-level replication
@@ -256,6 +272,7 @@ summary(m_simpson)
 ```
 
 
+### Prepare alpha-diversity data for visualisation
 
 ```{r}
 
@@ -384,9 +401,11 @@ ggsave(
 
 Measures community differences between treatments.
 
-## 🧮 Setup
+## Setup
 
-First, we'll need to transform the counts so that we account for the number of sequences. Values will no longer be counts, but rather the dominance for each taxa relative to the geometric mean of all taxa on the logarithmic scale.
+First, we'll need to transform the counts so that we account for the number of sequences. Values will no longer be counts, but rather the dominance for each taxa relative to the geometric mean of all taxa on the logarithmic scale
+
+### Apply a centred log-ratio transformation to the filtered ASV count data. This transformation treats the microbiome data as compositional and produces values suitable for Euclidean-distance-based ordination and beta-diversity analysis.
 
 ```{r}
 # CLR transformation
@@ -396,6 +415,8 @@ ps_clr <- microbiome::transform(ps_NB, "clr")
 ```
 
 Next, conduct the Principle Component Analysis (PCA), examine the relative importance of each PC, and generate the ordination.
+
+### Perform a principal-component ordination of the CLR-transformed community data and display a scree plot. The scree plot shows the proportion of total community variation represented by each ordination axis.
 
 ```{r}
 # Generate the principal components
@@ -413,7 +434,8 @@ head(ord_clr$CA$eig)
 sapply(ord_clr$CA$eig[1:5], function(x) x / sum(ord_clr$CA$eig))   
 ```
 
-## 📈 Plot ordination
+## Plot ordination
+### Calculate the variance explained by the first two ordination axes. These proportions are subsequently used to preserve the appropriate aspect ratio in the PCA plots.
 
 ```{r}
 # Plot the first two components
@@ -421,6 +443,8 @@ sapply(ord_clr$CA$eig[1:5], function(x) x / sum(ord_clr$CA$eig))
 clr1 <- ord_clr$CA$eig[1] / sum(ord_clr$CA$eig)
 clr2 <- ord_clr$CA$eig[2] / sum(ord_clr$CA$eig)
 ```
+
+### Create an exploratory PCA plot with treatment-specific points, 95% confidence ellipses, and marginal density distributions. 
 
 ```{r}
 png("./PCA_temp_1.png", width = 300, height = 225, units='mm', res = 300)
@@ -497,7 +521,9 @@ dev.off()
 
 It looks like there might be some separate clustering, suggesting possible differences in microbial communities according to treatment. We'll use a permutational multivariate analysis of variance (PERMANOVA) to test whether the samples cluster beyond that expected. Note that PERMANOVA is analogous to ANOVA, but is for multivariate distance data.
 
-## ❓ Permanova
+## Permanova
+### Calculate Euclidean distances among samples using the CLR-transformed ASV table and test for treatment-related differences in community composition with PERMANOVA. This is equivalent to testing Aitchison distances because Euclidean distance is applied after CLR transformation.
+
 ```{r}
 # Generate Euclidean distance matrix on the clr-transformed ASV data
 clr_dist_matrix <- phyloseq::distance(ps_clr, method = "euclidean") 
@@ -510,9 +536,9 @@ adonis2(clr_dist_matrix ~ treatment,
         data = meta)
 #adonis2(clr_dist_matrix ~ sample_data(ps_clr)$treatment)
 # formula = clr_dist_matrix ~ sample_data(ps_clr)$treatment
-# p = 0.001
 ```
 
+### Prepare the relative-abundance phyloseq object for taxonomic-composition plots and define a reusable plotting function. The function aggregates taxa at a selected rank, retains the most abundant groups, combines the remainder as 'Other', and creates faceted stacked-bar plots.
 
 ```{r}
 # Taxonomic composition plots
@@ -612,6 +638,7 @@ make_tax_composition_plot <- function(ps_obj,
 ```
 
 
+### Use the reusable composition-plot function to display sample-level bacterial composition at the phylum level. The ten most abundant phyla are shown.
 ```{r}
 # ------------------------------------------------------------
 # 3.1. Phylum-level taxonomic composition
@@ -643,15 +670,14 @@ ggsave(
 )
 ```
 
+### Use the reusable composition-plot function to display sample-level bacterial composition at the phylum level. 
 
 ```{r}
-# ============================================================
-# 3.2. Mean taxonomic composition per treatment (PHYLUM)
-# ============================================================
 
-# ------------------------------------------------------------
-# 1. Prepare phylum-level data
-# ------------------------------------------------------------
+# Mean taxonomic composition per treatment (PHYLUM)
+
+
+# Prepare phylum-level data
 
 ps_phylum <- tax_glom(ps_tss, taxrank = "Phylum", NArm = FALSE)
 
@@ -674,9 +700,7 @@ phylum_df <- psmelt(ps_phylum) %>%
     )
   )
 
-# ------------------------------------------------------------
-# 2. Identify dominant phyla
-# ------------------------------------------------------------
+# Identify dominant phyla
 
 top_phyla <- phylum_df %>%
   group_by(Phylum) %>%
@@ -685,9 +709,7 @@ top_phyla <- phylum_df %>%
   slice_head(n = 6) %>%
   pull(Phylum)
 
-# ------------------------------------------------------------
-# 3. Collapse rare phyla into Other at sample level
-# ------------------------------------------------------------
+# Collapse rare phyla into Other at sample level
 
 phylum_sample_summary <- phylum_df %>%
   mutate(
@@ -708,9 +730,7 @@ phylum_sample_summary %>%
     max_total = max(total)
   )
 
-# ------------------------------------------------------------
-# 4. Calculate mean relative abundance per treatment
-# ------------------------------------------------------------
+# Calculate mean relative abundance per treatment
 
 phylum_summary <- phylum_sample_summary %>%
   group_by(treatment, Phylum_plot) %>%
@@ -724,9 +744,7 @@ phylum_summary %>%
   group_by(treatment) %>%
   summarise(total = sum(mean_abundance), .groups = "drop")
 
-# ------------------------------------------------------------
-# 5. Order phyla
-# ------------------------------------------------------------
+# Order phyla
 
 phyla_order <- phylum_summary %>%
   group_by(Phylum_plot) %>%
@@ -741,9 +759,7 @@ phylum_summary <- phylum_summary %>%
     Phylum_plot = factor(Phylum_plot, levels = phyla_order)
   )
 
-# ------------------------------------------------------------
-# 6. Colours
-# ------------------------------------------------------------
+# Colours
 
 # Fixed phylum palette avoiding treatment colours
 phylum_cols <- c(
@@ -768,9 +784,7 @@ if (any(is.na(phylum_cols))) {
   )
 }
 
-# ------------------------------------------------------------
-# 7. Plot
-# ------------------------------------------------------------
+# Plot
 
 p_phylum_mean <- ggplot(
   phylum_summary,
@@ -808,9 +822,7 @@ p_phylum_mean <- ggplot(
 
 p_phylum_mean
 
-# ------------------------------------------------------------
-# 8. Save figure
-# ------------------------------------------------------------
+# Save figure
 
 ggsave(
   filename = here("figures", "phylum_mean_composition_final.pdf"),
@@ -829,16 +841,12 @@ ggsave(
 
 
 ```
-
+### Summarise genus-level relative abundance by treatment using the same general workflow as the phylum analysis. 
 
 ```{r}
-# ------------------------------------------------------------
-# 4. Genus-level taxonomic composition
-# ------------------------------------------------------------
+# Genus-level taxonomic composition
 
-# ------------------------------------------------------------
-# 1. Prepare genus-level data
-# ------------------------------------------------------------
+# Prepare genus-level data
 
 ps_genus <- tax_glom(ps_tss, taxrank = "Genus", NArm = FALSE)
 
@@ -855,9 +863,7 @@ genus_df <- psmelt(ps_genus) %>%
     )
   )
 
-# ------------------------------------------------------------
-# 2. Identify dominant genera
-# ------------------------------------------------------------
+# Identify dominant genera
 
 top_genera <- genus_df %>%
   group_by(Genus) %>%
@@ -866,9 +872,7 @@ top_genera <- genus_df %>%
   slice_head(n = 8) %>%
   pull(Genus)
 
-# ------------------------------------------------------------
-# 3. Collapse rare genera into Other at sample level
-# ------------------------------------------------------------
+# Collapse rare genera into Other at sample level
 
 genus_sample_summary <- genus_df %>%
   mutate(
@@ -889,9 +893,7 @@ genus_sample_summary %>%
     max_total = max(total)
   )
 
-# ------------------------------------------------------------
-# 4. Calculate mean relative abundance per treatment
-# ------------------------------------------------------------
+# Calculate mean relative abundance per treatment
 
 genus_summary <- genus_sample_summary %>%
   group_by(treatment, Genus_plot) %>%
@@ -905,9 +907,7 @@ genus_summary %>%
   group_by(treatment) %>%
   summarise(total = sum(mean_abundance), .groups = "drop")
 
-# ------------------------------------------------------------
-# 5. Order genera by global abundance, with Other last
-# ------------------------------------------------------------
+# Order genera by global abundance, with Other last
 
 genus_order <- genus_summary %>%
   group_by(Genus_plot) %>%
@@ -922,9 +922,7 @@ genus_summary <- genus_summary %>%
     Genus_plot = factor(Genus_plot, levels = genus_order)
   )
 
-# ------------------------------------------------------------
-# 6. Manual colour palette
-# ------------------------------------------------------------
+# Manual colour palette
 
 n_genera <- length(levels(genus_summary$Genus_plot))
 
@@ -939,9 +937,7 @@ if ("Other" %in% names(genus_cols)) {
   genus_cols["Other"] <- "grey85"
 }
 
-# ------------------------------------------------------------
-# 7. Plot
-# ------------------------------------------------------------
+# Plot
 
 p_genus_mean <- ggplot(
   genus_summary,
@@ -979,9 +975,7 @@ p_genus_mean <- ggplot(
 
 p_genus_mean
 
-# ------------------------------------------------------------
-# 8. Save figure
-# ------------------------------------------------------------
+# Save figure
 
 ggsave(
   filename = here("figures", "genus_mean_composition_final.pdf"),
@@ -1000,21 +994,16 @@ ggsave(
 
 ```
 
+### Construct the final beta-diversity ordination using principal coordinates analysis of Aitchison distances.
 
 ```{r}
-# ============================================================
 # Beta diversity: PCoA (CLR-transformed data)
-# ============================================================
 
-# ------------------------------------------------------------
-# 1. CLR transformation
-# ------------------------------------------------------------
+# CLR transformation
 
 ps_clr <- microbiome::transform(ps_NB, "clr")
 
-# ------------------------------------------------------------
-# 2. Distance matrix (Aitchison = Euclidean on CLR)
-# ------------------------------------------------------------
+# Distance matrix (Aitchison = Euclidean on CLR)
 
 clr_mat <- as(otu_table(ps_clr), "matrix")
 
@@ -1025,9 +1014,7 @@ if (taxa_are_rows(ps_clr)) {
 
 clr_dist <- dist(clr_mat, method = "euclidean")
 
-# ------------------------------------------------------------
-# 3. PCoA
-# ------------------------------------------------------------
+# PCoA
 
 pcoa_res <- cmdscale(clr_dist, eig = TRUE, k = 2)
 
@@ -1035,9 +1022,7 @@ pcoa_res <- cmdscale(clr_dist, eig = TRUE, k = 2)
 pcoa_df <- as.data.frame(pcoa_res$points)
 colnames(pcoa_df) <- c("PCoA1", "PCoA2")
 
-# ------------------------------------------------------------
-# 4. Add metadata
-# ------------------------------------------------------------
+# Add metadata
 
 meta_df <- data.frame(sample_data(ps_clr))
 
@@ -1057,9 +1042,7 @@ pcoa_df$treatment <- factor(
   labels = c("Control", "Low", "High")
 )
 
-# ------------------------------------------------------------
-# 5. Variance explained
-# ------------------------------------------------------------
+# Variance explained
 
 eig_vals <- pcoa_res$eig
 
@@ -1068,9 +1051,7 @@ var_explained <- eig_vals / sum(eig_vals)
 pc1_var <- round(var_explained[1] * 100, 1)
 pc2_var <- round(var_explained[2] * 100, 1)
 
-# ------------------------------------------------------------
-# 6. Plot
-# ------------------------------------------------------------
+# Plot
 
 p_pcoa <- ggplot(pcoa_df, aes(x = PCoA1, y = PCoA2, colour = treatment)) +
   geom_point(size = 3, alpha = 0.8) +
@@ -1106,9 +1087,7 @@ p_pcoa <- ggplot(pcoa_df, aes(x = PCoA1, y = PCoA2, colour = treatment)) +
 
 p_pcoa
 
-# ------------------------------------------------------------
-# 7. Save figure
-# ------------------------------------------------------------
+# Save figure
 
 ggsave(
   filename = here("figures", "pcoa_clr.pdf"),
@@ -1158,4 +1137,959 @@ ggsave(
   dpi = 600
 )
 ```
+
+###########################################################
+###########################################################
+
+## Sequencing depth quality control
+
+### Create a helper function for extracting sample sequencing depths from phyloseq objects, then compare read counts before and after filtering. The resulting table quantifies reads removed and the proportion retained for every sample.
+
+```{r}
+# Helper function: extract sample read depths
+
+get_sample_depths <- function(ps_object, depth_name) {
+
+  df <- data.frame(
+    sample = sample_names(ps_object),
+    reads = sample_sums(ps_object)
+  )
+
+  colnames(df)[2] <- depth_name
+
+  df
+}
+
+# Read depth before taxonomic/prevalence filtering
+depth_raw <- get_sample_depths(
+  ps_object = ps_NB_raw,
+  depth_name = "reads_before_filtering"
+)
+
+depth_filtered <- get_sample_depths(
+  ps_object = ps_NB,
+  depth_name = "reads_after_filtering"
+)
+
+# Combine before and after read depths
+depth_comparison <- full_join(
+  depth_raw,
+  depth_filtered,
+  by = "sample"
+) %>%
+  mutate(
+    reads_removed = reads_before_filtering - reads_after_filtering,
+    proportion_retained = reads_after_filtering / reads_before_filtering,
+    percent_retained = 100 * proportion_retained,
+    percent_removed = 100 - percent_retained
+  ) %>%
+  arrange(reads_after_filtering)
+
+depth_comparison
+```
+
+### Summarise the dimensions and sequencing depth of the microbiome dataset before and after filtering. 
+
+```{r}
+# Number of samples before and after filtering
+sample_summary <- tibble(
+  dataset = c("Before filtering", "After filtering"),
+  n_samples = c(nsamples(ps_NB_raw), nsamples(ps_NB)),
+  n_ASVs = c(ntaxa(ps_NB_raw), ntaxa(ps_NB)),
+  total_reads = c(
+    sum(sample_sums(ps_NB_raw)),
+    sum(sample_sums(ps_NB))
+  ),
+  mean_reads = c(
+    mean(sample_sums(ps_NB_raw)),
+    mean(sample_sums(ps_NB))
+  ),
+  median_reads = c(
+    median(sample_sums(ps_NB_raw)),
+    median(sample_sums(ps_NB))
+  ),
+  minimum_reads = c(
+    min(sample_sums(ps_NB_raw)),
+    min(sample_sums(ps_NB))
+  ),
+  maximum_reads = c(
+    max(sample_sums(ps_NB_raw)),
+    max(sample_sums(ps_NB))
+  )
+)
+
+sample_summary
+```
+
+### Count how many filtered samples fall below several candidate sequencing-depth thresholds. 
+```{r}
+# Thresholds chosen to show the lower tail of the distribution
+depth_thresholds <- c(1000, 2000, 3000, 5000, 10000)
+
+low_depth_counts <- tibble(
+  threshold = depth_thresholds,
+  n_samples_below_threshold = sapply(
+    depth_thresholds,
+    function(x) sum(sample_sums(ps_NB) < x)
+  ),
+  percent_samples_below_threshold = sapply(
+    depth_thresholds,
+    function(x) {
+      100 * mean(sample_sums(ps_NB) < x)
+    }
+  )
+)
+
+low_depth_counts
+```
+
+### Apply a 5,000-read diagnostic threshold and list all samples below it. This step is exploratory and identifies samples that may warrant closer inspection rather than automatically removing them.
+
+```{r}
+sum(sample_sums(ps_NB) < 5000)
+
+low_depth_cutoff <- 5000
+
+low_depth_samples <- depth_comparison %>%
+  filter(reads_after_filtering < low_depth_cutoff) %>%
+  arrange(reads_after_filtering)
+
+low_depth_samples
+```
+
+### Join the low-depth sample list to the experimental metadata. 
+
+```{r}
+metadata_df <- data.frame(sample_data(ps_NB)) %>%
+  rownames_to_column("sample")
+
+low_depth_samples_metadata <- low_depth_samples %>%
+  left_join(metadata_df, by = "sample")
+
+low_depth_samples_metadata
+```
+
+### Plot the distribution of post-filtering read depths and mark the 5,000-read diagnostic cutoff. 
+
+```{r}
+ggplot(depth_comparison, aes(x = reads_after_filtering)) +
+  geom_histogram(bins = 30, colour = "black", fill = "grey80") +
+  geom_vline(
+    xintercept = low_depth_cutoff,
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  labs(
+    x = "Reads per sample after filtering",
+    y = "Number of samples"
+  ) +
+  theme_bw()
+```
+
+### Compare each sample's read depth before and after filtering.
+
+```{r}
+ggplot(
+  depth_comparison,
+  aes(
+    x = reads_before_filtering,
+    y = reads_after_filtering
+  )
+) +
+  geom_point() +
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Reads before filtering",
+    y = "Reads after filtering"
+  ) +
+  theme_bw()
+```
+
+```{r}
+low_depth_loss_summary <- low_depth_samples_metadata %>%
+  select(
+    sample,
+    reads_before_filtering,
+    reads_after_filtering,
+    reads_removed,
+    percent_retained,
+    percent_removed,
+    everything()
+  )
+
+low_depth_loss_summary
+```
+
+
+
+```{r}
+# DETAILED QC REPORT FOR EXTREME READ-LOSS SAMPLES
+# Samples identified as having unusually high read loss
+samples_to_check <- c(
+  "60HT17.fastq",
+  "69HT8.fastq",
+  "81CT9.fastq"
+)
+
+# ------------------------------------------------------------
+# 1. Helper: convert phyloseq OTU table to samples x ASVs
+# ------------------------------------------------------------
+
+otu_samples_by_taxa <- function(ps_object) {
+
+  otu <- as(otu_table(ps_object), "matrix")
+
+  if (taxa_are_rows(ps_object)) {
+    otu <- t(otu)
+  }
+
+  return(otu)
+}
+
+otu_raw <- otu_samples_by_taxa(ps_NB_raw)
+otu_filtered <- otu_samples_by_taxa(ps_NB)
+
+# Keep only samples present in both objects
+samples_to_check <- intersect(
+  samples_to_check,
+  intersect(rownames(otu_raw), rownames(otu_filtered))
+)
+
+samples_to_check
+```
+
+```{r}
+read_loss_report <- tibble(
+  sample = samples_to_check,
+  reads_before = rowSums(otu_raw[samples_to_check, , drop = FALSE]),
+  reads_after = rowSums(otu_filtered[samples_to_check, , drop = FALSE])
+) %>%
+  mutate(
+    reads_removed = reads_before - reads_after,
+    percent_retained = 100 * reads_after / reads_before,
+    percent_removed = 100 - percent_retained
+  ) %>%
+  arrange(percent_retained)
+
+read_loss_report
+```
+### Quantify total reads before and after filtering for each flagged sample. 
+
+```{r}
+taxonomy_raw <- as(tax_table(ps_NB_raw), "matrix") %>%
+  as.data.frame() %>%
+  rownames_to_column("ASV")
+
+taxonomy_filtered <- as(tax_table(ps_NB), "matrix") %>%
+  as.data.frame() %>%
+  rownames_to_column("ASV")
+
+get_top_ASVs_before <- function(sample_name, n_top = 20) {
+
+  counts <- otu_raw[sample_name, ]
+
+  tibble(
+    sample = sample_name,
+    ASV = names(counts),
+    reads_before = as.numeric(counts)
+  ) %>%
+    filter(reads_before > 0) %>%
+    mutate(
+      relative_abundance_before =
+        reads_before / sum(reads_before)
+    ) %>%
+    arrange(desc(reads_before)) %>%
+    slice_head(n = n_top) %>%
+    left_join(taxonomy_raw, by = "ASV") %>%
+    mutate(
+      retained_after_filtering =
+        ASV %in% colnames(otu_filtered)
+    )
+}
+top_ASVs_before <- bind_rows(
+  lapply(
+    samples_to_check,
+    get_top_ASVs_before,
+    n_top = 20
+  )
+)
+
+top_ASVs_before
+
+top_ASVs_before %>%
+  select(
+    sample,
+    ASV,
+    reads_before,
+    relative_abundance_before,
+    retained_after_filtering,
+    Domain,
+    Phylum,
+    Class,
+    Order,
+    Family,
+    Genus,
+    Species
+  )
+```
+
+### Retrieve the post-filtering count for each dominant ASV identified in the flagged samples. 
+
+```{r}
+get_after_count <- function(sample_name, ASV_name) {
+
+  if (
+    sample_name %in% rownames(otu_filtered) &&
+    ASV_name %in% colnames(otu_filtered)
+  ) {
+    return(otu_filtered[sample_name, ASV_name])
+  }
+
+  return(0)
+}
+
+top_ASVs_comparison <- top_ASVs_before %>%
+  rowwise() %>%
+  mutate(
+    reads_after = get_after_count(sample, ASV),
+    reads_removed = reads_before - reads_after
+  ) %>%
+  ungroup() %>%
+  mutate(
+    percent_of_ASV_reads_retained =
+      100 * reads_after / reads_before
+  )
+
+top_ASVs_comparison %>%
+  select(
+    sample,
+    ASV,
+    reads_before,
+    reads_after,
+    reads_removed,
+    relative_abundance_before,
+    retained_after_filtering,
+    percent_of_ASV_reads_retained,
+    Phylum,
+    Class,
+    Order,
+    Family,
+    Genus
+  )
+```
+
+
+
+
+```{r}
+ASV_dataset_context <- tibble(
+  ASV = colnames(otu_raw),
+  total_reads_all_samples = colSums(otu_raw),
+  prevalence_n_samples = colSums(otu_raw > 0),
+  prevalence_percent =
+    100 * colSums(otu_raw > 0) / nrow(otu_raw),
+  mean_reads_when_present = apply(
+    otu_raw,
+    2,
+    function(x) {
+      if (sum(x > 0) == 0) return(0)
+      mean(x[x > 0])
+    }
+  ),
+  median_reads_when_present = apply(
+    otu_raw,
+    2,
+    function(x) {
+      if (sum(x > 0) == 0) return(0)
+      median(x[x > 0])
+    }
+  )
+)
+
+top_ASVs_context <- top_ASVs_comparison %>%
+  left_join(
+    ASV_dataset_context,
+    by = "ASV"
+  ) %>%
+  arrange(sample, desc(reads_before))
+
+top_ASVs_context %>%
+  select(
+    sample,
+    ASV,
+    reads_before,
+    reads_after,
+    relative_abundance_before,
+    retained_after_filtering,
+    prevalence_n_samples,
+    prevalence_percent,
+    total_reads_all_samples,
+    Phylum,
+    Class,
+    Order,
+    Family,
+    Genus
+  )
+```
+
+### Run basic integrity checks on the final filtered phyloseq object before differential-abundance analysis. The checks confirm sample and ASV counts, sequencing-depth ranges, and the presence of the treatment and tank metadata variables required by the model.
+
+```{r}
+# BASIC CHECKS
+
+ps_NB
+
+nsamples(ps_NB)
+ntaxa(ps_NB)
+
+summary(sample_sums(ps_NB))
+range(sample_sums(ps_NB))
+
+# Inspect metadata column names
+colnames(sample_data(ps_NB))
+
+# Confirm treatment and tank are present
+stopifnot(
+  "treatment" %in% colnames(sample_data(ps_NB)),
+  "tank" %in% colnames(sample_data(ps_NB))
+)
+```
+
+```{r}
+ps_NB <- prune_taxa(
+  taxa_sums(ps_NB) > 0,
+  ps_NB
+)
+```
+
+### Prepare raw count data for genus-level MaAsLin2 analysis. 
+
+```{r}
+# AGGREGATE RAW COUNTS TO GENUS LEVEL
+
+# Remove taxa without a usable genus assignment
+ps_genus_maaslin <- subset_taxa(
+  ps_NB,
+  !is.na(Genus) &
+    Genus != "" &
+    Genus != "g__Unclassified" &
+    Genus != "Unclassified"
+)
+
+# Agglomerate ASVs belonging to the same genus
+ps_genus_maaslin <- tax_glom(
+  ps_genus_maaslin,
+  taxrank = "Genus",
+  NArm = TRUE
+)
+
+# Remove taxa with zero counts, if any
+ps_genus_maaslin <- prune_taxa(
+  taxa_sums(ps_genus_maaslin) > 0,
+  ps_genus_maaslin
+)
+
+ps_genus_maaslin
+
+nsamples(ps_genus_maaslin)
+ntaxa(ps_genus_maaslin)
+```
+
+```{r}
+# EXTRACT GENUS COUNT TABLE
+
+genus_counts <- as(
+  otu_table(ps_genus_maaslin),
+  "matrix"
+)
+
+# Ensure samples are rows and genera are columns
+if (taxa_are_rows(ps_genus_maaslin)) {
+  genus_counts <- t(genus_counts)
+}
+
+genus_counts <- as.data.frame(genus_counts)
+
+dim(genus_counts)
+genus_counts[1:5, 1:min(5, ncol(genus_counts))]
+```
+
+```{r}
+# ASSIGN READABLE GENUS NAMES
+
+genus_taxonomy <- as.data.frame(
+  tax_table(ps_genus_maaslin)
+)
+
+genus_taxonomy$Genus <- as.character(genus_taxonomy$Genus)
+
+# Remove GTDB-style genus prefix
+genus_taxonomy$Genus <- gsub(
+  "^g__",
+  "",
+  genus_taxonomy$Genus
+)
+
+# Ensure names are syntactically valid and unique
+genus_names <- make.unique(
+  make.names(genus_taxonomy$Genus)
+)
+
+# Taxonomy rows correspond to genus-count columns
+colnames(genus_counts) <- genus_names
+
+# Confirm unique names
+anyDuplicated(colnames(genus_counts))
+# Should return 0
+
+head(colnames(genus_counts))
+```
+
+```{r}
+# PREPARE SAMPLE METADATA
+
+maaslin_metadata <- data.frame(
+  sample_data(ps_genus_maaslin)
+)
+
+# Ensure row names are sample IDs
+head(rownames(maaslin_metadata))
+head(rownames(genus_counts))
+
+# Add sequencing depth based on the final filtered ASV object
+maaslin_metadata$reads <- sample_sums(ps_NB)[
+  rownames(maaslin_metadata)
+]
+
+maaslin_metadata$log_reads <- log(
+  maaslin_metadata$reads
+)
+
+# Treatment: set Control as reference
+maaslin_metadata$treatment <- factor(
+  maaslin_metadata$treatment,
+  levels = c("C", "L", "H"),
+  labels = c("Control", "Low", "High")
+)
+
+# Tank must be categorical
+maaslin_metadata$tank <- factor(
+  maaslin_metadata$tank
+)
+
+# Check treatment sample sizes
+table(maaslin_metadata$treatment)
+
+# Check tank replication
+table(maaslin_metadata$tank)
+
+# Mean number of fish per tank
+mean(table(maaslin_metadata$tank))
+```
+
+```{r}
+# ALIGN SAMPLE ORDER
+
+common_samples <- intersect(
+  rownames(genus_counts),
+  rownames(maaslin_metadata)
+)
+
+length(common_samples)
+
+genus_counts <- genus_counts[
+  common_samples,
+  ,
+  drop = FALSE
+]
+
+maaslin_metadata <- maaslin_metadata[
+  common_samples,
+  ,
+  drop = FALSE
+]
+
+# Put metadata in exactly the same order
+maaslin_metadata <- maaslin_metadata[
+  rownames(genus_counts),
+  ,
+  drop = FALSE
+]
+
+# Confirm perfect alignment
+stopifnot(
+  identical(
+    rownames(genus_counts),
+    rownames(maaslin_metadata)
+  )
+)
+
+dim(genus_counts)
+dim(maaslin_metadata)
+```
+
+```{r}
+# CHECK GENUS PREVALENCE AND ABUNDANCE BEFORE MAASLIN
+
+# Relative abundance only for QC summaries
+genus_relative_abundance <- sweep(
+  as.matrix(genus_counts),
+  1,
+  rowSums(genus_counts),
+  "/"
+)
+
+genus_prevalence <- colMeans(
+  genus_counts > 0
+)
+
+genus_mean_abundance <- colMeans(
+  genus_relative_abundance,
+  na.rm = TRUE
+)
+
+genus_filter_summary <- tibble(
+  Genus = colnames(genus_counts),
+  prevalence = genus_prevalence,
+  prevalence_percent = genus_prevalence * 100,
+  mean_relative_abundance = genus_mean_abundance
+) %>%
+  arrange(desc(mean_relative_abundance))
+
+genus_filter_summary
+```
+
+
+
+```{r}
+# OUTPUT DIRECTORY
+
+maaslin_output <- here(
+  "outputs",
+  "maaslin2_genus"
+)
+
+# Remove an old output directory before rerunning
+# Uncomment only when you deliberately want to overwrite it
+#
+# if (dir.exists(maaslin_output)) {
+#   unlink(maaslin_output, recursive = TRUE)
+# }
+
+dir.create(
+  maaslin_output,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+```
+
+
+### Fit the genus-level MaAsLin2 model. Treatment and sequencing depth are included as fixed effects, tank is included as a random effect, Control is the reference group, and multiple testing is controlled using the Benjamini-Hochberg false-discovery-rate procedure.
+
+```{r}
+set.seed(123)
+
+fit_maaslin2_genus <- Maaslin2::Maaslin2(
+  input_data = genus_counts,
+  input_metadata = maaslin_metadata,
+  output = maaslin_output,
+
+  fixed_effects = c(
+    "treatment",
+    "log_reads"
+  ),
+
+  random_effects = c(
+    "tank"
+  ),
+
+  reference = "treatment,Control",
+
+  normalization = "TSS",
+  transform = "LOG",
+  analysis_method = "LM",
+
+  min_prevalence = 0.10,
+  min_abundance = 0.0001,
+
+  correction = "BH",
+  standardize = FALSE,
+
+  max_significance = 0.05,
+  plot_heatmap = TRUE,
+  plot_scatter = TRUE,
+
+  save_models = TRUE
+)
+```
+
+
+```{r}
+maaslin_all_results <- read_tsv(
+  file.path(
+    maaslin_output,
+    "all_results.tsv"
+  ),
+  show_col_types = FALSE
+)
+
+glimpse(maaslin_all_results)
+
+maaslin_all_results %>%
+  arrange(qval) %>%
+  head(20)
+```
+
+```{r}
+treatment_results <- maaslin_all_results %>%
+  filter(metadata == "treatment") %>%
+  arrange(qval, pval)
+
+treatment_results
+```
+
+
+```{r}
+unique(treatment_results$value)
+
+```
+
+### Identify treatment-associated genera that remain significant after false-discovery-rate correction at q < 0.05. 
+```{r}
+significant_treatment_results <- treatment_results %>%
+  filter(qval < 0.05) %>%
+  arrange(qval)
+
+significant_treatment_results
+
+nrow(significant_treatment_results)
+```
+
+### Add effect-direction and approximate fold-change interpretations to the treatment results. Positive coefficients indicate higher abundance than Control, whereas negative coefficients indicate lower abundance.
+
+```{r}
+treatment_results_interpreted <- treatment_results %>%
+  mutate(
+    approximate_fold_change = exp(coef),
+    direction = case_when(
+      coef > 0 ~ "Higher than Control",
+      coef < 0 ~ "Lower than Control",
+      TRUE ~ "No change"
+    )
+  ) %>%
+  arrange(qval)
+
+treatment_results_interpreted %>%
+  select(
+    feature,
+    value,
+    coef,
+    approximate_fold_change,
+    direction,
+    pval,
+    qval,
+    N,
+    N.not.0
+  )
+```
+
+```{r}
+genus_long <- genus_counts %>%
+  rownames_to_column("sample") %>%
+  pivot_longer(
+    cols = -sample,
+    names_to = "feature",
+    values_to = "count"
+  ) %>%
+  left_join(
+    maaslin_metadata %>%
+      rownames_to_column("sample") %>%
+      select(
+        sample,
+        treatment,
+        tank,
+        reads
+      ),
+    by = "sample"
+  ) %>%
+  mutate(
+    detected = count > 0
+  )
+
+genus_support <- genus_long %>%
+  group_by(
+    feature,
+    treatment
+  ) %>%
+  summarise(
+    n_samples = n(),
+    n_detected = sum(detected),
+    prevalence_percent = 100 * mean(detected),
+    median_count_when_present = ifelse(
+      any(detected),
+      median(count[detected]),
+      NA_real_
+    ),
+    .groups = "drop"
+  )
+
+genus_support
+```
+
+```{r}
+significant_genus_support <- genus_support %>%
+  filter(
+    feature %in%
+      significant_treatment_results$feature
+  )
+
+significant_genus_support
+```
+
+```{r}
+if (nrow(significant_treatment_results) > 0) {
+
+  significant_genera <- unique(
+    significant_treatment_results$feature
+  )
+
+  plot_data_significant <- genus_long %>%
+    filter(feature %in% significant_genera) %>%
+    group_by(sample) %>%
+    mutate(
+      relative_abundance =
+        count / sum(count)
+    ) %>%
+    ungroup()
+
+  p_maaslin_significant <- ggplot(
+    plot_data_significant,
+    aes(
+      x = treatment,
+      y = relative_abundance
+    )
+  ) +
+    geom_violin(
+      trim = FALSE,
+      alpha = 0.3
+    ) +
+    geom_jitter(
+      width = 0.15,
+      alpha = 0.6
+    ) +
+    facet_wrap(
+      ~ feature,
+      scales = "free_y"
+    ) +
+    scale_y_continuous(
+      labels = scales::percent_format()
+    ) +
+    labs(
+      x = "Fluoxetine treatment",
+      y = "Relative abundance"
+    ) +
+    theme_bw()
+
+  p_maaslin_significant
+
+  ggsave(
+    filename = here(
+      "figures",
+      "maaslin2_significant_genera.pdf"
+    ),
+    plot = p_maaslin_significant,
+    width = 9,
+    height = 6
+  )
+}
+```
+
+```{r}
+genus_prevalence_summary <- tibble(
+  Genus = colnames(genus_counts),
+  n_samples_present = colSums(genus_counts > 0),
+  prevalence = colMeans(genus_counts > 0),
+  prevalence_percent = 100 * colMeans(genus_counts > 0),
+  total_reads = colSums(genus_counts)
+) %>%
+  arrange(desc(prevalence))
+```
+
+### Export the principal MaAsLin2 result and quality-control tables. Separate files are created for all treatment results, FDR-significant results, genus prevalence, and treatment-specific support summaries.
+
+```{r}
+write_csv(
+  treatment_results_interpreted,
+  file.path(
+    maaslin_output,
+    "treatment_results_all.csv"
+  )
+)
+
+write_csv(
+  significant_treatment_results,
+  file.path(
+    maaslin_output,
+    "treatment_results_significant_q005.csv"
+  )
+)
+
+write_csv(
+  genus_prevalence_summary,
+  file.path(
+    maaslin_output,
+    "genus_prevalence_summary.csv"
+  )
+)
+
+write_csv(
+  genus_support,
+  file.path(
+    maaslin_output,
+    "genus_support_by_treatment.csv"
+  )
+)
+```
+
+### Summarise the differential-abundance analysis by reporting the number of genera tested and the number of treatment associations significant after FDR correction. 
+
+```{r}
+n_genera_tested <- treatment_results %>%
+  distinct(feature) %>%
+  nrow()
+
+n_significant <- significant_treatment_results %>%
+  distinct(feature, value) %>%
+  nrow()
+
+cat(
+  "Genera tested:", n_genera_tested, "\n",
+  "Significant treatment associations after FDR correction:",
+  n_significant, "\n"
+)
+```
+```{r}
+table(maaslin_metadata$treatment)
+
+nrow(treatment_results)
+
+significant_treatment_results
+
+treatment_results_interpreted %>%
+  select(
+    feature,
+    value,
+    coef,
+    pval,
+    qval,
+    N,
+    N.not.0
+  ) %>%
+  head(30)
+```
+
 

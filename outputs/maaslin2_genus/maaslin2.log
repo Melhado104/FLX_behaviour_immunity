@@ -1,0 +1,152 @@
+2026-07-17 10:43:15 INFO::Writing function arguments to log file
+2026-07-17 10:43:15 DEBUG::Function arguments
+2026-07-17 10:43:15 DEBUG::Output folder: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus
+2026-07-17 10:43:15 DEBUG::Min Abundance: 0.000100
+2026-07-17 10:43:15 DEBUG::Min Prevalence: 0.100000
+2026-07-17 10:43:15 DEBUG::Normalization: TSS
+2026-07-17 10:43:15 DEBUG::Transform: LOG
+2026-07-17 10:43:15 DEBUG::Analysis method: LM
+2026-07-17 10:43:15 DEBUG::Max significance: 0.050000
+2026-07-17 10:43:15 DEBUG::Random effects: tank
+2026-07-17 10:43:15 DEBUG::Fixed effects: treatment,log_reads
+2026-07-17 10:43:15 DEBUG::Correction method: BH
+2026-07-17 10:43:15 DEBUG::Standardize: FALSE
+2026-07-17 10:43:15 DEBUG::Cores: 1
+2026-07-17 10:43:15 INFO::Verifying options selected are valid
+2026-07-17 10:43:15 INFO::Determining format of input files
+2026-07-17 10:43:15 INFO::Input format is data samples as rows and metadata samples as rows
+2026-07-17 10:43:15 DEBUG::A total of 121 samples were found in both the data and metadata
+2026-07-17 10:43:15 DEBUG::Reordering data/metadata to use same sample ordering
+2026-07-17 10:43:15 INFO::Formula for random effects: expr ~ (1 | tank)
+2026-07-17 10:43:15 INFO::Formula for fixed effects: expr ~  treatment + log_reads
+2026-07-17 10:43:15 INFO::Filter data based on min abundance and min prevalence
+2026-07-17 10:43:15 INFO::Total samples in data: 121
+2026-07-17 10:43:15 INFO::Min samples required with min abundance for a feature not to be filtered: 12.100000
+2026-07-17 10:43:15 INFO::Total filtered features: 0
+2026-07-17 10:43:15 INFO::Filtered feature names from abundance and prevalence filtering:
+2026-07-17 10:43:15 INFO::Total filtered features with variance filtering: 0
+2026-07-17 10:43:15 INFO::Filtered feature names from variance filtering:
+2026-07-17 10:43:15 INFO::Running selected normalization method: TSS
+2026-07-17 10:43:15 INFO::Bypass z-score application to metadata
+2026-07-17 10:43:15 INFO::Running selected transform method: LOG
+2026-07-17 10:43:15 INFO::Running selected analysis method: LM
+2026-07-17 10:43:15 INFO::Fitting model to feature number 1, SOKP01
+2026-07-17 10:43:15 INFO::Fitting model to feature number 2, Cutibacterium
+2026-07-17 10:43:15 INFO::Fitting model to feature number 3, Streptomyces
+2026-07-17 10:43:15 INFO::Fitting model to feature number 4, Bifidobacterium
+2026-07-17 10:43:15 INFO::Fitting model to feature number 5, Bifidobacterium.1
+2026-07-17 10:43:15 INFO::Fitting model to feature number 6, Microbacterium
+2026-07-17 10:43:16 INFO::Fitting model to feature number 7, NM07.P.09
+2026-07-17 10:43:16 INFO::Fitting model to feature number 8, Deinococcus
+2026-07-17 10:43:16 INFO::Fitting model to feature number 9, Pseudomonas_E
+2026-07-17 10:43:16 INFO::Fitting model to feature number 10, Pseudomonas
+2026-07-17 10:43:16 INFO::Fitting model to feature number 11, Halomonas
+2026-07-17 10:43:16 INFO::Fitting model to feature number 12, Acidibacter
+2026-07-17 10:43:16 INFO::Fitting model to feature number 13, ZC4RG30
+2026-07-17 10:43:16 INFO::Fitting model to feature number 14, Methylophaga
+2026-07-17 10:43:16 INFO::Fitting model to feature number 15, Thiomicrorhabdus
+2026-07-17 10:43:16 INFO::Fitting model to feature number 16, Hylemonella
+2026-07-17 10:43:16 INFO::Fitting model to feature number 17, Variovorax
+2026-07-17 10:43:16 INFO::Fitting model to feature number 18, Limnohabitans
+2026-07-17 10:43:16 INFO::Fitting model to feature number 19, Acidovorax
+2026-07-17 10:43:16 INFO::Fitting model to feature number 20, Pelomonas
+2026-07-17 10:43:16 INFO::Fitting model to feature number 21, Aquabacterium
+2026-07-17 10:43:16 INFO::Fitting model to feature number 22, Aquabacterium.1
+2026-07-17 10:43:16 INFO::Fitting model to feature number 23, Aquincola
+2026-07-17 10:43:16 INFO::Fitting model to feature number 24, Lautropia
+2026-07-17 10:43:16 INFO::Fitting model to feature number 25, Undibacterium
+2026-07-17 10:43:16 INFO::Fitting model to feature number 26, Massilia
+2026-07-17 10:43:16 INFO::Fitting model to feature number 27, Herbaspirillum
+2026-07-17 10:43:16 INFO::Fitting model to feature number 28, Herbaspirillum.1
+2026-07-17 10:43:16 INFO::Fitting model to feature number 29, Ralstonia
+2026-07-17 10:43:16 INFO::Fitting model to feature number 30, Neisseria
+2026-07-17 10:43:17 INFO::Fitting model to feature number 31, Moraxella_A
+2026-07-17 10:43:17 INFO::Fitting model to feature number 32, Moraxella
+2026-07-17 10:43:17 INFO::Fitting model to feature number 33, Acinetobacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 34, Klebsiella
+2026-07-17 10:43:17 INFO::Fitting model to feature number 35, Vibrio
+2026-07-17 10:43:17 INFO::Fitting model to feature number 36, Brevundimonas
+2026-07-17 10:43:17 INFO::Fitting model to feature number 37, Caulobacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 38, Tardiphaga
+2026-07-17 10:43:17 INFO::Fitting model to feature number 39, Bradyrhizobium
+2026-07-17 10:43:17 INFO::Fitting model to feature number 40, Methylobacterium.Methylorubrum
+2026-07-17 10:43:17 INFO::Fitting model to feature number 41, Methylobacterium
+2026-07-17 10:43:17 INFO::Fitting model to feature number 42, Bosea
+2026-07-17 10:43:17 INFO::Fitting model to feature number 43, Nereida
+2026-07-17 10:43:17 INFO::Fitting model to feature number 44, HIMB11
+2026-07-17 10:43:17 INFO::Fitting model to feature number 45, Phaeobacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 46, Erythrobacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 47, Qipengyuania
+2026-07-17 10:43:17 INFO::Fitting model to feature number 48, Novosphingobium
+2026-07-17 10:43:17 INFO::Fitting model to feature number 49, Sphingomonas
+2026-07-17 10:43:17 INFO::Fitting model to feature number 50, Pelagibacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 51, VGCI01
+2026-07-17 10:43:17 INFO::Fitting model to feature number 52, Rikenella
+2026-07-17 10:43:17 INFO::Fitting model to feature number 53, Odoribacter
+2026-07-17 10:43:17 INFO::Fitting model to feature number 54, Alistipes
+2026-07-17 10:43:18 INFO::Fitting model to feature number 55, Phocaeicola
+2026-07-17 10:43:18 INFO::Fitting model to feature number 56, Bacteroides
+2026-07-17 10:43:18 INFO::Fitting model to feature number 57, Prevotella
+2026-07-17 10:43:18 INFO::Fitting model to feature number 58, Cryptobacteroides
+2026-07-17 10:43:18 INFO::Fitting model to feature number 59, Desulfovibrio
+2026-07-17 10:43:18 INFO::Fitting model to feature number 60, Desulfovibrio.1
+2026-07-17 10:43:18 INFO::Fitting model to feature number 61, Desulfovibrio.2
+2026-07-17 10:43:18 INFO::Fitting model to feature number 62, Mucispirillum
+2026-07-17 10:43:18 INFO::Fitting model to feature number 63, Fimbriiglobus
+2026-07-17 10:43:18 INFO::Fitting model to feature number 64, Dysosmobacter
+2026-07-17 10:43:18 INFO::Fitting model to feature number 65, Pelethomonas
+2026-07-17 10:43:18 INFO::Fitting model to feature number 66, Enterenecus
+2026-07-17 10:43:18 INFO::Fitting model to feature number 67, Neglecta
+2026-07-17 10:43:18 INFO::Fitting model to feature number 68, Eubacterium_R
+2026-07-17 10:43:18 INFO::Fitting model to feature number 69, HGM12619
+2026-07-17 10:43:18 INFO::Fitting model to feature number 70, UBA3282
+2026-07-17 10:43:18 INFO::Fitting model to feature number 71, COE1
+2026-07-17 10:43:18 INFO::Fitting model to feature number 72, Lachnospiraceae.NK4A136.group
+2026-07-17 10:43:18 INFO::Fitting model to feature number 73, Gemella
+2026-07-17 10:43:18 INFO::Fitting model to feature number 74, Ligilactobacillus
+2026-07-17 10:43:18 INFO::Fitting model to feature number 75, Lactobacillus
+2026-07-17 10:43:18 INFO::Fitting model to feature number 76, Clostridium
+2026-07-17 10:43:18 INFO::Fitting model to feature number 77, Turicibacter
+2026-07-17 10:43:18 INFO::Fitting model to feature number 78, Staphylococcus
+2026-07-17 10:43:19 INFO::Fitting model to feature number 79, Priestia
+2026-07-17 10:43:19 INFO::Fitting model to feature number 80, Niallia
+2026-07-17 10:43:19 INFO::Fitting model to feature number 81, Rossellomorea
+2026-07-17 10:43:19 INFO::Fitting model to feature number 82, Anaerobacillus
+2026-07-17 10:43:19 INFO::Fitting model to feature number 83, Ileibacterium
+2026-07-17 10:43:19 INFO::Fitting model to feature number 84, Dubosiella
+2026-07-17 10:43:19 INFO::Fitting model to feature number 85, Faecalibaculum
+2026-07-17 10:43:19 INFO::Fitting model to feature number 86, Stenotrophomonas
+2026-07-17 10:43:19 INFO::Fitting model to feature number 87, Lacticaseibacillus
+2026-07-17 10:43:19 INFO::Fitting model to feature number 88, Duncaniella
+2026-07-17 10:43:19 INFO::Fitting model to feature number 89, CAG.485
+2026-07-17 10:43:19 INFO::Fitting model to feature number 90, Duncaniella.1
+2026-07-17 10:43:19 INFO::Fitting model to feature number 91, UBA7173
+2026-07-17 10:43:19 INFO::Fitting model to feature number 92, Paramuribaculum
+2026-07-17 10:43:19 INFO::Fitting model to feature number 93, Muribaculum
+2026-07-17 10:43:19 INFO::Fitting model to feature number 94, Streptococcus
+2026-07-17 10:43:19 INFO::Counting total values for each feature
+2026-07-17 10:43:19 WARNING::Deleting existing model objects file: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/models.rds
+2026-07-17 10:43:19 INFO::Writing model objects to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/models.rds
+2026-07-17 10:43:20 INFO::Writing filtered data to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/features/filtered_data.tsv
+2026-07-17 10:43:20 INFO::Writing filtered, normalized data to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/features/filtered_data_norm.tsv
+2026-07-17 10:43:20 INFO::Writing filtered, normalized, transformed data to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/features/filtered_data_norm_transformed.tsv
+2026-07-17 10:43:20 WARNING::Deleting existing residuals file: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/residuals.rds
+2026-07-17 10:43:20 INFO::Writing residuals to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/residuals.rds
+2026-07-17 10:43:20 WARNING::Deleting existing fitted file: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/fitted.rds
+2026-07-17 10:43:20 INFO::Writing fitted values to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/fitted.rds
+2026-07-17 10:43:20 WARNING::Deleting existing ranef file: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/ranef.rds
+2026-07-17 10:43:20 INFO::Writing extracted random effects to file C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/fits/ranef.rds
+2026-07-17 10:43:20 INFO::Writing all results to file (ordered by increasing q-values): C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/all_results.tsv
+2026-07-17 10:43:20 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.050000 ) to file (ordered by increasing q-values): C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/significant_results.tsv
+2026-07-17 10:43:20 INFO::Writing heatmap of significant results to file: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus/heatmap.pdf
+2026-07-17 10:43:20 INFO::Writing association plots (one for each significant association) to output folder: C:/Users/gmel0011/Documents/microbiome/outputs/maaslin2_genus
+2026-07-17 10:43:20 INFO::Plotting associations from most to least significant, grouped by metadata
+2026-07-17 10:43:20 INFO::Plotting data for metadata number 1, log_reads
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs Faecalibaculum
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs Lachnospiraceae.NK4A136.group
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs Bradyrhizobium
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs Ileibacterium
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs ZC4RG30
+2026-07-17 10:43:20 INFO::Creating scatter plot for continuous data, log_reads vs Desulfovibrio.1
+2026-07-17 10:43:21 INFO::Creating scatter plot for continuous data, log_reads vs Methylobacterium
+2026-07-17 10:43:21 INFO::Creating scatter plot for continuous data, log_reads vs Paramuribaculum

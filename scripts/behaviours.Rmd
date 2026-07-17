@@ -167,15 +167,15 @@ p_distance <- ggplot() +
   geom_jitter(
     data = data,
     aes(x = Treatment, y = Distance_moved, colour = Treatment),
-    width = 0.18,
-    alpha = 0.55,
+    width = 0.15,
+    alpha = 0.60,
     size = 2
   ) +
   geom_errorbar(
     data = emm_dist_df,
     aes(x = Treatment, ymin = lower, ymax = upper, colour = Treatment),
     width = 0.25,
-    linewidth = 1.3
+    linewidth = 1.2
   ) +
   geom_point(
     data = emm_dist_df,
