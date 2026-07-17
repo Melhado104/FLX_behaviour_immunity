@@ -9,12 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Load the packages used for data manipulation, project-relative file paths, generalised linear mixed-effects models, residual diagnostics, estimated marginal means, plotting, and figure assembly. Using pacman::p_load() also installs packages that are not already available in the R library.
+
 ```{r}
 # Load packages
 pacman::p_load(tidyverse, here, glmmTMB, DHARMa, performance, broom.mixed, car, dplyr, emmeans, ggeffects, scales, patchwork)
 
 ```
-
 
 ```{r}
 # Load Data
@@ -36,6 +37,10 @@ data <- data %>%
 
 ```
 
+## Identify fish that did not emerge
+
+Create a subset that excludes fish recorded as not emerging from the shelter, and compare the full and reduced sample sizes. This documents how many fish produced post-emergence behavioural observations and could be used in analyses that require emergence.
+
 ```{r}
 # Create a subset excluding fish not came out
 # Remove fish that did not come out of shelter
@@ -45,6 +50,11 @@ data_subset <- subset(data, notes != "not came out")
 nrow(data)        # 160
 nrow(data_subset) # 126
 ```
+
+## Analyse emergence probability
+
+Convert the emergence outcome into a binary variable, where fish that did not emerge are coded as 0 and all others as 1. Fit a binomial generalised linear mixed-effects model to test whether emergence probability differs among treatments while controlling for body mass and accounting for tank-level clustering. Estimated marginal means are then returned on the probability scale.
+
 ```{r}
 data$emerged <- ifelse(data$notes == "not came out", 0, 1)
 
@@ -62,6 +72,9 @@ summary(emm, type = "response")
 
 ```
 
+## Explore behavioural-variable distributions
+
+Summarise and visualise the raw distributions of distance moved, freezing time, and time spent in the shelter. These descriptive statistics and histograms help identify skewness, zero inflation, boundary values, and other distributional features that inform the choice of statistical model.
 
 ```{r}
 summary(data$Distance_moved)
@@ -74,7 +87,9 @@ hist(data$Time_shelter)
 
 ```
 
+## Model distance moved
 
+Fit a Tweedie generalised linear mixed-effects model for distance moved. Treatment and body mass are included as fixed effects, tank is included as a random intercept, and DHARMa simulation-based diagnostics are used to assess residual behaviour, dispersion, zero inflation, and outliers before testing the overall treatment effect.
 
 ```{r}
 #Distance_moved
@@ -97,6 +112,7 @@ Anova(m2_distance_moved)
 
 ```
 
+## Plot distance moved
 
 ```{r}
 # Plotting Distance_moved
@@ -104,7 +120,7 @@ Anova(m2_distance_moved)
 # 1) Ensure treatment order
 data$Treatment <- factor(
   data$Treatment,
-  levels = c("Control", "low", "high")
+  levels = c("Control", "Low", "High")
 )
 
 # 2) Fit Tweedie model
@@ -135,7 +151,7 @@ if (is.na(mean_col) || is.na(lower_col) || is.na(upper_col)) {
 }
 
 emm_dist_df <- emm_dist_df %>%
-  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "Low", "High"))) %>%
   rename(
     mean  = !!mean_col,
     lower = !!lower_col,
@@ -145,14 +161,14 @@ emm_dist_df <- emm_dist_df %>%
 # 5) Palettes
 pastel_cols <- c(
   "Control" = "#A8D5BA",
-  "low"     = "#F9E79F",
-  "high"    = "#F5B7B1"
+  "Low"     = "#F9E79F",
+  "High"    = "#F5B7B1"
 )
 
 dark_cols <- c(
   "Control" = "#2E8B57",
-  "low"     = "#C9A227",
-  "high"    = "#B22222"
+  "Low"     = "#C9A227",
+  "High"    = "#B22222"
 )
 
 # 6) Plot on original distance scale
@@ -222,7 +238,9 @@ ggsave(
 
 ```
 
+## Model Shelter Use
 
+Restrict the shelter-time analysis to observations strictly between zero and the 1,200-second trial limit, convert time to a proportion, and fit a beta mixed-effects model. The model tests treatment effects while controlling for body mass and tank, followed by DHARMa diagnostics and an omnibus treatment test.
 
 ```{r}
 #Time_shelter
@@ -248,7 +266,7 @@ testOutliers(res_beta)
 Anova(beta)
 
 ```
-
+## Plot Shelter Use
 
 ```{r}
 # Plotting Time_shelter
@@ -256,7 +274,7 @@ Anova(beta)
 # 1) Ensure treatment order
 data$Treatment <- factor(
   data$Treatment,
-  levels = c("Control", "low", "high")
+  levels = c("Control", "Low", "High")
 )
 
 # 2) Create log-transformed shelter time
@@ -283,7 +301,7 @@ lower_col <- dplyr::first(cn[grepl("^lower\\.CL$|^asymp\\.LCL$|^LCL$|^lower$", c
 upper_col <- dplyr::first(cn[grepl("^upper\\.CL$|^asymp\\.UCL$|^UCL$|^upper$", cn)])
 
 emm_logTS_df <- emm_logTS_df %>%
-  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "Low", "High"))) %>%
   rename(mean_log = !!mean_col, lower_log = !!lower_col, upper_log = !!upper_col) %>%
   mutate(
     mean  = exp(mean_log) - 1,
@@ -294,14 +312,14 @@ emm_logTS_df <- emm_logTS_df %>%
 # 6) Palettes
 pastel_cols <- c(
   "Control" = "#A8D5BA",
-  "low"     = "#F9E79F",
-  "high"    = "#F5B7B1"
+  "Low"     = "#F9E79F",
+  "High"    = "#F5B7B1"
 )
 
 dark_cols <- c(
   "Control" = "#2E8B57",
-  "low"     = "#C9A227",
-  "high"    = "#B22222"
+  "Low"     = "#C9A227",
+  "High"    = "#B22222"
 )
 
 # 7) Plot on original scale
@@ -354,8 +372,13 @@ ggsave(
   dpi = 600
 )
 
+p_shelter
+
 ```
 
+## Model freezing time
+
+Fit a Tweedie generalised linear mixed-effects model for time spent not moving, used here as the measure of freezing behaviour. Treatment and body mass are included as fixed effects and tank as a random intercept. Simulation-based residual checks are performed before evaluating the overall treatment effect.
 
 ```{r}
 ## Time_freezing
@@ -379,13 +402,16 @@ Anova(m1_time_not_moving)
 
 ```
 
+
+## Plot freezing time
+
 ```{r}
 ## Time_not_moving (freezing time)
 
 # 1) Ensure treatment order
 data$Treatment <- factor(
   data$Treatment,
-  levels = c("Control", "low", "high")
+  levels = c("Control", "Low", "High")
 )
 
 # 2) Fit Tweedie model
@@ -416,7 +442,7 @@ if (is.na(mean_col) || is.na(lower_col) || is.na(upper_col)) {
 }
 
 emm_freezing <- emm_freezing %>%
-  mutate(Treatment = factor(Treatment, levels = c("Control", "low", "high"))) %>%
+  mutate(Treatment = factor(Treatment, levels = c("Control", "Low", "High"))) %>%
   rename(
     mean  = !!mean_col,
     lower = !!lower_col,
@@ -426,14 +452,14 @@ emm_freezing <- emm_freezing %>%
 # 5) Colour palettes
 pastel_cols <- c(
   "Control" = "#A8D5BA",
-  "low"     = "#F9E79F",
-  "high"    = "#F5B7B1"
+  "Low"     = "#F9E79F",
+  "High"    = "#F5B7B1"
 )
 
 dark_cols <- c(
   "Control" = "#2E8B57",
-  "low"     = "#C9A227",
-  "high"    = "#B22222"
+  "Low"     = "#C9A227",
+  "High"    = "#B22222"
 )
 
 # 6) Plot
