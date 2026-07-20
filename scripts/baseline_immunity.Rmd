@@ -22,6 +22,8 @@ data <- read.csv(here("data", "exp1_data.csv"))
 
 ```
 
+## Explore data distribution
+
 ```{r}
 
 summary(data$total_wbc)
@@ -37,6 +39,11 @@ hist(data$Monocyte)
 hist(data$`N.L_ratio`)
 
 ```
+
+## Quantify the contribution of monocytes
+
+Calculate the percentage of all classified leukocytes represented by monocytes across the dataset. This descriptive calculation is used to determine whether monocytes contribute enough observations to justify a separate inferential analysis.
+
 ```{r}
 # percentage of total leukocytes represented by monocytes
 # Total leukocytes counted
@@ -54,7 +61,9 @@ monocyte_percent <- sum(data$Monocyte, na.rm = TRUE) /
 monocyte_percent
 ```
 
+## Analyse total white blood cell (WBC) count
 
+Describe total white blood cell counts, apply a square-root transformation to reduce skewness, and fit a Gaussian mixed-effects model testing the effect of fluoxetine treatment while controlling for body mass. Tank identity is included as a random intercept to account for non-independence among fish housed in the same tank. Model assumptions are evaluated using simulated residuals, followed by an omnibus treatment test and Tukey-adjusted pairwise comparisons.
 
 ```{r}
 #WBC
@@ -84,15 +93,16 @@ emm_wbc <- emmeans(m_wbc, ~ Treatment)
 pairs(emm_wbc, adjust = "tukey")
 ```
 
+## Plot total white blood cell count
+
 ```{r}
-# Plotting WBC
 
 # Set treatment order
 data <- data %>%
   mutate(
     Treatment = factor(
       Treatment,
-      levels = c("Control", "low", "high")
+      levels = c("Control", "Low", "High")
     )
   )
 
@@ -119,14 +129,14 @@ emm_df <- emm_df %>%
 # 5) Colour palettes
 pastel_cols <- c(
   "Control" = "#A8D5BA",
-  "low"     = "#F9E79F",
-  "high"    = "#F5B7B1"
+  "Low"     = "#F9E79F",
+  "High"    = "#F5B7B1"
 )
 
 dark_cols <- c(
   "Control" = "#2E8B57",
-  "low"     = "#C9A227",
-  "high"    = "#B22222"
+  "Low"     = "#C9A227",
+  "High"    = "#B22222"
 )
 
 # 6) Plot
@@ -209,6 +219,10 @@ ggsave(
 
 ```
 
+## Analyse the neutrophil-to-lymphocyte ratio
+
+Summarise the neutrophil-to-lymphocyte ratio, log-transform it to improve model fit, and test treatment effects with a Gaussian mixed-effects model that includes body mass and tank identity. Residual diagnostics, an omnibus treatment test, and Tukey-adjusted pairwise comparisons are used to evaluate model adequacy and treatment differences.
+
 ```{r}
 #N/L ratio
 mean(data$N.L_ratio)
@@ -237,13 +251,13 @@ pairs(emm_NL, adjust = "tukey")
 
 ```
 
-```{r}
-# Plotting N:L ratio
+## Plot the neutrophil-to-lymphocyte ratio
 
+```{r}
 # 1) Ensure treatment order BEFORE fitting the model
 data$Treatment <- factor(
   data$Treatment,
-  levels = c("Control", "low", "high")
+  levels = c("Control", "Low", "High")
 )
 
 # 2) Refit model after setting treatment order
@@ -256,21 +270,21 @@ m_NL <- glmmTMB(
 # 3) Colours
 pastel_cols <- c(
   "Control" = "#A8D5BA",
-  "low"     = "#F9E79F",
-  "high"    = "#F5B7B1"
+  "Low"     = "#F9E79F",
+  "High"    = "#F5B7B1"
 )
 
 dark_cols <- c(
   "Control" = "#2E8B57",
-  "low"     = "#C9A227",
-  "high"    = "#B22222"
+  "Low"     = "#C9A227",
+  "High"    = "#B22222"
 )
 
 # 4) Get emmeans on log scale and back-transform
 emm_NL_df <- emmeans(m_NL, ~ Treatment) %>%
   as.data.frame() %>%
   dplyr::mutate(
-    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    Treatment = factor(Treatment, levels = c("Control", "Low", "High")),
     emmean_bt = exp(emmean),
     lower_bt  = exp(lower.CL),
     upper_bt  = exp(upper.CL)
@@ -353,6 +367,10 @@ ggsave(
 )
 ```
 
+## Analyse lymphocyte proportions
+
+Analyse lymphocyte proportions to determine whether changes in the neutrophil-to-lymphocyte (N:L) ratio are driven by alterations in lymphocyte abundance. Because the N:L ratio can increase through either a reduction in lymphocytes, an increase in neutrophils, or both, each leukocyte type is analysed separately to identify the cellular mechanism underlying any observed treatment effect. Lymphocyte percentages are modelled as grouped binomial data using a beta-binomial mixed-effects model, with treatment and body mass included as fixed effects and tank included as a random intercept. Residual diagnostics and Tukey-adjusted pairwise comparisons are then used to evaluate treatment differences.
+
 
 ```{r}
 # Lymphocytes
@@ -374,6 +392,10 @@ pairs(emm_lymph, adjust = "tukey")
 
 
 ```
+
+## Analyse neutrophil proportions
+
+Analyse neutrophil proportions to determine whether changes in the neutrophil-to-lymphocyte (N:L) ratio are driven by increases in neutrophil abundance. Together with the lymphocyte analysis, this allows the biological basis of any treatment-induced changes in the N:L ratio to be identified. Neutrophil percentages are modelled as grouped binomial data using a beta-binomial mixed-effects model, with treatment and body mass included as fixed effects and tank included as a random intercept. Residual diagnostics and Tukey-adjusted pairwise comparisons are then used to evaluate treatment differences.
 
 ```{r}
 #Neutrophils
@@ -400,10 +422,12 @@ pairs(emm_lymph, adjust = "tukey")
 
 ```
 
+## Plot lymphocyte and neutrophil proportions
+
 ```{r}
-#PLotting Lymphocytes and neutrophils
+#Plotting Lymphocytes and neutrophils
 # Ensure treatment order
-data$Treatment <- factor(data$Treatment, levels = c("Control", "low", "high"))
+data$Treatment <- factor(data$Treatment, levels = c("Control", "Low", "High"))
 
 # ---------------------------
 # 1) Long-format raw data
@@ -421,7 +445,7 @@ raw_long <- data %>%
 emm_lymph <- emmeans(m_lymph_bb, ~ Treatment, type = "response") %>%
   as.data.frame() %>%
   transmute(
-    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    Treatment = factor(Treatment, levels = c("Control", "Low", "High")),
     Cell_type = factor("Lymphocyte", levels = c("Lymphocyte", "Neutrophil")),
     mean_pct  = prob * 100,
     lower_pct = asymp.LCL * 100,
@@ -431,7 +455,7 @@ emm_lymph <- emmeans(m_lymph_bb, ~ Treatment, type = "response") %>%
 emm_neut <- emmeans(m_neut_bb, ~ Treatment, type = "response") %>%
   as.data.frame() %>%
   transmute(
-    Treatment = factor(Treatment, levels = c("Control", "low", "high")),
+    Treatment = factor(Treatment, levels = c("Control", "Low", "High")),
     Cell_type = factor("Neutrophil", levels = c("Lymphocyte", "Neutrophil")),
     mean_pct  = prob * 100,
     lower_pct = asymp.LCL * 100,
@@ -528,7 +552,10 @@ ggsave(
 
 ```
 
-#Absolute number of lymphocyte
+## Analyse absolute lymphocyte abundance
+
+Estimate the absolute number of lymphocytes by multiplying the lymphocyte percentage by total white blood cell count.
+
 ```{r}
 # Create absolute lymphocyte estimate
 data$Abs_Lymphocyte <- (data$Lymphocyte / 100) * data$total_wbc
@@ -563,7 +590,10 @@ emm_abs_lymph <- emmeans(m_abs_lymph, ~ Treatment)
 pairs(emm_abs_lymph, adjust = "tukey")
 ```
 
-#Absolute number of Neutrophil
+# Analyse absolute neutrophil abundance
+
+Estimate absolute neutrophil abundance from the neutrophil percentage and total white blood cell count. 
+
 ```{r}
 # Create absolute neutrophil abundance
 data$Abs_Neutrophil <- (data$Neutrophil / 100) * data$total_wbc
@@ -600,39 +630,7 @@ pairs(emm_abs_neut, adjust = "tukey")
 
 ```
 
-```{r}
-# Layout:
-# A | B
-
-figure_immunity <- (
-  p_wbc | p_abs_lymphocyte_neutrophils
-) +
-  plot_annotation(tag_levels = "A") &
-  theme(
-    plot.tag = element_text(
-      size = 18,
-      face = "bold"
-    )
-  )
-
-# Display
-figure_immunity
-
-ggsave(
-  filename = here::here("figures", "immune_figure.pdf"),
-  plot = figure_immunity,
-  width = 9,
-  height = 4.5
-)
-
-ggsave(
-  filename = here::here("figures", "immune_figure.jpg"),
-  plot = figure_immunity,
-  width = 9,
-  height = 4.5,
-  dpi = 600
-)
-```
+## Plot absolute lymphocyte and neutrophil abundance
 
 ```{r}
 # Plotting absolute lymphocytes and neutrophils
@@ -640,7 +638,7 @@ ggsave(
 # Ensure treatment order
 data$Treatment <- factor(
   data$Treatment,
-  levels = c("Control", "low", "high")
+  levels = c("Control", "Low", "High")
 )
 
 # ---------------------------
@@ -673,7 +671,7 @@ emm_lymph_abs <- emmeans(m_abs_lymph, ~ Treatment) %>%
   dplyr::transmute(
     Treatment = factor(
       Treatment,
-      levels = c("Control", "low", "high")
+      levels = c("Control", "Low", "High")
     ),
     Cell_type = factor(
       "Lymphocyte",
@@ -689,7 +687,7 @@ emm_neut_abs <- emmeans(m_abs_neut, ~ Treatment) %>%
   dplyr::transmute(
     Treatment = factor(
       Treatment,
-      levels = c("Control", "low", "high")
+      levels = c("Control", "Low", "High")
     ),
     Cell_type = factor(
       "Neutrophil",
@@ -815,3 +813,39 @@ ggsave(
 )
 ```
 
+
+## Assemble the final immunity figure
+
+```{r}
+# Layout:
+# A | B
+
+figure_immunity <- (
+  p_wbc | p_abs_lymphocyte_neutrophils
+) +
+  plot_annotation(tag_levels = "A") &
+  theme(
+    plot.tag = element_text(
+      size = 18,
+      face = "bold"
+    )
+  )
+
+# Display
+figure_immunity
+
+ggsave(
+  filename = here::here("figures", "immune_figure.pdf"),
+  plot = figure_immunity,
+  width = 9,
+  height = 4.5
+)
+
+ggsave(
+  filename = here::here("figures", "immune_figure.jpg"),
+  plot = figure_immunity,
+  width = 9,
+  height = 4.5,
+  dpi = 600
+)
+```
